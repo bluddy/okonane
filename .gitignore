@@ -1,0 +1,10 @@
+*.cmo
+*.cmi
+*.depends
+*.cma
+*.pdf
+*.swp
+*.tgz
+*.byte
+*.native
+_build/
