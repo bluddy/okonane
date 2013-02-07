@@ -9,7 +9,15 @@ type square_t =
           | Slow
           | Path
 
-type grid_t = ((int * int) * (square_t list) list)
+type loc_t = (int * int)
+
+type grid_data_t = (square_t list) list
+
+type grid_t = { size : (int * int);
+                start : loc_t;
+                goal : loc_t;
+                data : grid_data_t;
+               }
 
 let square_of_char = function
     | '#'       -> Obstacle
@@ -17,7 +25,7 @@ let square_of_char = function
     | 'g' | 'G' -> Goal
     | '.'       -> Open
     | ','       -> Slow
-    | '*'       -> Path
+    | 'o'       -> Path
     | x         -> invalid_arg @: "don't know how to convert char "^(String.make 1 x)
 
 let string_of_square = function
@@ -26,7 +34,7 @@ let string_of_square = function
     | Goal     -> "g"
     | Open     -> "."
     | Slow     -> ","
-    | Path     -> "*"
+    | Path     -> "o"
 
 let cost_of_square = function
     | Obstacle -> None
@@ -52,7 +60,15 @@ let string_of_gridline gridl =
     in s^"\n"
 
 let string_of_grid g =
-    List.fold_left (fun acc line -> acc^string_of_gridline line) "" @: snd g
+    List.fold_left (fun acc line -> acc^string_of_gridline line) "" g.data
+
+let find_square g sq =
+    let (width, height) = g.size in
+    let w_r = create_range 0 width in
+    let h_r = create_range 0 height in
+    let map_line j line = List.map2 (fun i x -> (x, (i, j))) w_r line in
+    let num_data = List.flatten @: List.map2 map_line h_r g.data in
+    List.assoc sq num_data
 
 let grid_of_file file : grid_t =
     let lines = read_file_lines file in
@@ -64,7 +80,12 @@ let grid_of_file file : grid_t =
                        let lines'' = list_take height lines' in
              if height = List.length lines'' then
                  let data = List.map (gridline_of_string ~expected_len:(Some width)) lines''
-                 in ((width, height), data)
+                 in let grid = 
+                     {size = (width, height); data = data; 
+                       start = (0,0); goal = (0,0)} in
+                 let start = find_square grid Start in
+                 let goal = find_square grid Goal in
+                 { grid with start = start; goal = goal }
              else invalid_arg "Bad file format: missing lines"
          | _ -> invalid_arg "Bad file format: missing width/height"
         end
@@ -73,18 +94,17 @@ let grid_of_file file : grid_t =
 exception LookupError of string
 
 let lookup grid (x, y) = 
-    let g = snd grid in
+    let g = grid.data in
     try
         let gridline = List.nth g y in
         List.nth gridline x
     with Not_found -> raise @: LookupError ("positiong "^string_of_int x^"
         "^string_of_int y^" is not in the grid")
-       
 
 type dir_t = Up | Down | Left | Right
 
 let clamp_move grid x y dir = 
-    let (w, h) = fst grid in
+    let (w, h) = grid.size in
     match x, y, dir with
      | 0, _, Left                 -> None
      | _, 0, Up                   -> None
@@ -95,8 +115,7 @@ let clamp_move grid x y dir =
      | x, y, Left                 -> Some (x-1, y)
      | x, y, Right                -> Some (x+1, y)
 
-
-let expand grid x y = 
+let expand grid (x,y) = 
     match lookup grid (x, y) with
     | Obstacle -> raise @: LookupError "Cannot expand on an obstacle"
     | _        -> let dirs = [Up; Down; Left; Right] in
@@ -110,9 +129,3 @@ let expand grid x y =
                       | None -> [])
           clamped_moves costs
     
-    
-
-
-
-
-
