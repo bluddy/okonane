@@ -23,9 +23,11 @@ let parse_cmd_line () = Arg.parse param_specs (fun str -> target_file := str) us
 
 let do_search file search = 
     let g = grid_of_file file in
-    let path, cost = match search with
-      | BFS -> bfs g in
-    let dirs_str = string_of_dirs @: dirs_of_locs path in
+    let path, cost = try begin match search with
+      | BFS -> bfs g
+    end 
+    with No_path -> ([], -1)
+    in let dirs_str = string_of_dirs @: dirs_of_locs path in
     let g_final = set_squares g Path path in
     let g_str = string_of_grid g_final in
     dirs_str, cost, g_str

@@ -48,7 +48,7 @@ let gridline_of_string ?(expected_len=None) str =
     let len = String.length str in
     let convert l = 
         let rng = create_range 0 len in
-        let li = List.map (fun i -> square_of_char @: str.[i]) rng in
+        let li = list_map (fun i -> square_of_char @: str.[i]) rng in
         Array.of_list li
     in
     match expected_len with
@@ -87,7 +87,7 @@ let grid_of_file file : grid_t =
                        let height = int_of_string h in
                        let lines'' = list_take height lines' in
              if height = List.length lines'' then
-                 let data_list = List.map (gridline_of_string ~expected_len:(Some width)) lines''
+                 let data_list = list_map (gridline_of_string ~expected_len:(Some width)) lines''
                  in let data = Array.of_list data_list in
                  let grid = 
                      {size = (width, height); data = data; 
@@ -115,7 +115,7 @@ let string_of_dir = function
     | Right -> "right"
 
 let string_of_dirs dirs = 
-    let strs = List.map string_of_dir dirs in
+    let strs = list_map string_of_dir dirs in
     String.concat ", " strs
 
 let dirs_of_locs locs = 
@@ -150,10 +150,10 @@ let expand grid (x,y) =
     match lookup grid (x, y) with
     | Obstacle -> raise @: LookupError "Cannot expand on an obstacle"
     | _        -> let dirs = [Up; Down; Left; Right] in
-      let moves = List.map (clamp_move grid x y) dirs in
+      let moves = list_map (clamp_move grid x y) dirs in
       let clamped_moves = flatten_option moves in
-      let squares = List.map (lookup grid) clamped_moves in
-      let costs = List.map cost_of_square squares in
+      let squares = list_map (lookup grid) clamped_moves in
+      let costs = list_map cost_of_square squares in
       List.flatten @: List.map2 
           (fun move cost -> match cost with 
                         Some x -> [(move, x)] 

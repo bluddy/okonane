@@ -109,3 +109,6 @@ let array_find_return pred arr =
     index := !index - 1;
     !index, !data
 
+(* tail recursive, so more efficient than mapping alone *)
+let list_map f l = List.rev @: List.rev_map f l
+
