@@ -119,15 +119,20 @@ let string_of_dirs dirs =
     String.concat ", " strs
 
 let dirs_of_locs locs = 
-    let dir_of_loc ((lastx, lasty), acc) ((x,y) as loc) = 
-        match (x-lastx, y-lasty) with
-         | 0, -1 -> loc, Up::acc
-         | 0, 1  -> loc, Down::acc
-         | 1, 0  -> loc, Right::acc
-         | -1, 0 -> loc, Left::acc
-         | _     -> invalid_arg "Improper movement"
-    in
-    List.rev @: snd @: List.fold_left dir_of_loc (List.hd locs, []) @: List.tl locs
+    match locs with 
+      | l::ls ->
+        let dir_of_loc ((lastx, lasty), acc) ((x,y) as loc) = 
+            begin match (x-lastx, y-lasty) with
+             | 0, -1 -> loc, Up::acc
+             | 0, 1  -> loc, Down::acc
+             | 1, 0  -> loc, Right::acc
+             | -1, 0 -> loc, Left::acc
+             | _     -> invalid_arg "Improper movement"
+            end in
+        List.rev @: snd @: List.fold_left dir_of_loc (List.hd locs, []) @: 
+            List.tl locs
+      | _ -> [] (* not enough locs for dirs *)
+
 
 let clamp_move grid x y dir = 
     let (w, h) = grid.size in
@@ -150,8 +155,8 @@ let expand grid (x,y) =
       let squares = List.map (lookup grid) clamped_moves in
       let costs = List.map cost_of_square squares in
       List.flatten @: List.map2 
-          (fun m c -> match c with 
-                        Some x -> [(m, x)] 
+          (fun move cost -> match cost with 
+                        Some x -> [(move, x)] 
                       | None -> [])
           clamped_moves costs
     
