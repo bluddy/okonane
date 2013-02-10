@@ -9,7 +9,7 @@ type square_t =
           | Slow
           | Path
 
-type loc_t = (int * int)
+type loc_t = (int * int)  (* x, y *)
 
 type grid_data_t = (square_t list) list
 
@@ -69,6 +69,22 @@ let find_square g sq =
     let map_line j line = List.map2 (fun i x -> (x, (i, j))) w_r line in
     let num_data = List.flatten @: List.map2 map_line h_r g.data in
     List.assoc sq num_data
+
+let change_nth li nth a = 
+    let newl = List.fold_left 
+        (fun (acc, count) elem -> if count = nth then (a::acc, count+1)
+                                  else elem::acc, count+1)
+        ([], 0) li
+    in List.rev @: fst @: newl
+    
+let set_square g sq (x,y) =
+    let listy = List.nth g.data y in
+    let listy' = change_nth listy x sq in
+    let data = change_nth g.data y listy' in
+    {g with data=data}
+
+let set_squares g sq locs = 
+    List.fold_left (fun acc_g loc -> set_square acc_g sq loc) g locs
 
 let grid_of_file file : grid_t =
     let lines = read_file_lines file in
