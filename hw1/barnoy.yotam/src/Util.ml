@@ -82,3 +82,30 @@ let insert_index_snd first xs =
 
 let flatten_option l = List.flatten @: List.map 
     (fun x -> match x with None -> [] | Some a -> [a]) l
+
+let array_find pred arr =
+    let l = Array.length arr and index = ref 0 and found = ref false in
+    while not !found && !index < l do
+        found := pred arr.(!index);
+        index := !index + 1;
+    done;
+    index := !index - 1;
+    if not !found then raise Not_found
+    else !index, arr.(!index)
+
+(* a form of array find that allows a predicate to return any data *)
+let array_find_return pred arr =
+    let l = Array.length arr and index = ref 0 and found = ref false in
+    let data = ref None in
+    let eval () = 
+        data := pred arr.(!index);
+        found := match !data with
+          | None   -> false
+          | Some x -> true;
+    in while not !found && !index < l do
+        eval ();
+        index := !index + 1;
+    done;
+    index := !index - 1;
+    !index, !data
+

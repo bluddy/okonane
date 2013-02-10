@@ -11,7 +11,7 @@ type square_t =
 
 type loc_t = (int * int)  (* x, y *)
 
-type grid_data_t = (square_t list) list
+type grid_data_t = (square_t array) array
 
 type grid_t = { size : (int * int);
                 start : loc_t;
@@ -48,7 +48,8 @@ let gridline_of_string ?(expected_len=None) str =
     let len = String.length str in
     let convert l = 
         let rng = create_range 0 len in
-        List.map (fun i -> square_of_char @: str.[i]) rng
+        let li = List.map (fun i -> square_of_char @: str.[i]) rng in
+        Array.of_list li
     in
     match expected_len with
       | None                 -> convert len
@@ -56,32 +57,23 @@ let gridline_of_string ?(expected_len=None) str =
       | _                    -> invalid_arg "Bad file: wrong string length"
 
 let string_of_gridline gridl =
-    let s = List.fold_left (fun acc square -> acc^string_of_square square) "" gridl
+    let s = Array.fold_left (fun acc square -> acc^string_of_square square) "" gridl
     in s^"\n"
 
 let string_of_grid g =
-    List.fold_left (fun acc line -> acc^string_of_gridline line) "" g.data
+    Array.fold_left (fun acc line -> acc^string_of_gridline line) "" g.data
 
-let find_square g sq =
-    let (width, height) = g.size in
-    let w_r = create_range 0 width in
-    let h_r = create_range 0 height in
-    let map_line j line = List.map2 (fun i x -> (x, (i, j))) w_r line in
-    let num_data = List.flatten @: List.map2 map_line h_r g.data in
-    List.assoc sq num_data
+let find_square grid sq =
+    let find_in_line line_arr = try Some(array_find ((=) sq) line_arr) 
+                                with Not_found -> None in
+    let (j, maybeval) = array_find_return find_in_line grid.data in
+    match maybeval with
+     | None        -> raise Not_found
+     | Some (i, _) -> (i, j)
 
-let change_nth li nth a = 
-    let newl = List.fold_left 
-        (fun (acc, count) elem -> if count = nth then (a::acc, count+1)
-                                  else elem::acc, count+1)
-        ([], 0) li
-    in List.rev @: fst @: newl
-    
 let set_square g sq (x,y) =
-    let listy = List.nth g.data y in
-    let listy' = change_nth listy x sq in
-    let data = change_nth g.data y listy' in
-    {g with data=data}
+    let line_arr = g.data.(y) in
+    line_arr.(x) <- sq; g
 
 let set_squares g sq locs = 
     List.fold_left (fun acc_g loc -> set_square acc_g sq loc) g locs
@@ -95,8 +87,9 @@ let grid_of_file file : grid_t =
                        let height = int_of_string h in
                        let lines'' = list_take height lines' in
              if height = List.length lines'' then
-                 let data = List.map (gridline_of_string ~expected_len:(Some width)) lines''
-                 in let grid = 
+                 let data_list = List.map (gridline_of_string ~expected_len:(Some width)) lines''
+                 in let data = Array.of_list data_list in
+                 let grid = 
                      {size = (width, height); data = data; 
                        start = (0,0); goal = (0,0)} in
                  let start = find_square grid Start in
@@ -110,14 +103,31 @@ let grid_of_file file : grid_t =
 exception LookupError of string
 
 let lookup grid (x, y) = 
-    let g = grid.data in
-    try
-        let gridline = List.nth g y in
-        List.nth gridline x
-    with Not_found -> raise @: LookupError ("positiong "^string_of_int x^"
-        "^string_of_int y^" is not in the grid")
+    let line_arr = grid.data.(y) in
+    line_arr.(x) 
 
 type dir_t = Up | Down | Left | Right
+
+let string_of_dir = function
+    | Up    -> "up"
+    | Down  -> "down"
+    | Left  -> "left"
+    | Right -> "right"
+
+let string_of_dirs dirs = 
+    let strs = List.map string_of_dir dirs in
+    String.concat ", " strs
+
+let dirs_of_locs locs = 
+    let dir_of_loc ((lastx, lasty), acc) ((x,y) as loc) = 
+        match (x-lastx, y-lasty) with
+         | 0, -1 -> loc, Up::acc
+         | 0, 1  -> loc, Down::acc
+         | 1, 0  -> loc, Right::acc
+         | -1, 0 -> loc, Left::acc
+         | _     -> invalid_arg "Improper movement"
+    in
+    List.rev @: snd @: List.fold_left dir_of_loc (List.hd locs, []) @: List.tl locs
 
 let clamp_move grid x y dir = 
     let (w, h) = grid.size in
