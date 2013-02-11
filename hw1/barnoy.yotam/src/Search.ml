@@ -3,26 +3,26 @@ open Grid
 
 exception No_path
 
-let multisearch f_create f_push f_pop f_isempty grid = 
-    let q = f_create () in
-    let rec search loc path cost = 
-        let goto_next () = 
-            if f_isempty q then None
-            else 
-                let (next, next_path, next_cost) = f_pop q in
-                search next next_path next_cost 
+let search f_create f_push f_pop f_isempty grid = 
+    let rec loop loc path cost queue = 
+        let goto_next q = match f_pop q with
+            | None -> None
+            | Some ((next, n_path, n_cost), q') -> loop next n_path n_cost q'
         in let path' = loc::path in
         if loc = grid.goal then Some (List.rev path', cost)
         else
-            if List.exists ((=) loc) path then goto_next () (* loop detection *)
+            if List.exists ((=) loc) path then goto_next queue (* loop detection *)
             else
                 let options = expand grid loc in
-                List.iter (fun (x, c) -> f_push (x, path', cost + c) q) options;
-                goto_next ()
-    in search grid.start [] 0
+                let q' = List.fold_left 
+                    (fun accq (x, c) -> f_push (x, path', cost + c) accq) queue options
+                in goto_next q'
+    in
+    let q_init = f_create in
+    loop grid.start [] 0 q_init
 
-let bfs = multisearch Queue.create Queue.push Queue.pop Queue.is_empty
-let dfs = multisearch Stack.create Stack.push Stack.pop Stack.is_empty
+let bfs = search BatDeque.empty (flip BatDeque.snoc) BatDeque.front BatDeque.is_empty
+let dfs = search BatDeque.empty BatDeque.cons BatDeque.front BatDeque.is_empty
 
 (* Iterative deepening depth first search *)
 (*let iddfs = *)

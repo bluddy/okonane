@@ -4,6 +4,8 @@
  * many () from our code *)
 let (@:) f x = f x;;
 
+let flip f a b = f b a
+
 let compose f g = fun x -> f (g x)
 
 let id_fn a = a
