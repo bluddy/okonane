@@ -11,12 +11,21 @@ let search f_create f_push f_pop f_isempty grid =
         in let path' = loc::path in
         if loc = grid.goal then Some (List.rev path', cost)
         else
-            if List.exists ((=) loc) path then goto_next queue (* loop detection *)
+            (* loop detection *)
+            let q', skip = BatDeque.fold_right 
+                (fun l (accq, skip) -> match l with
+                    | (loc', _, cost') as x when loc' = loc && cost' <= cost ->
+                            BatDeque.cons x accq, true
+                    | loc', _, cost' when loc' = loc && cost' < cost  -> accq, false
+                    | x -> (BatDeque.cons x accq, skip)
+                )
+                queue (BatDeque.empty, false) in 
+            if skip then goto_next q'
             else
                 let options = expand grid loc in
-                let q' = List.fold_left 
-                    (fun accq (x, c) -> f_push (x, path', cost + c) accq) queue options
-                in goto_next q'
+                let q'' = List.fold_left 
+                    (fun accq (x, c) -> f_push (x, path', cost + c) accq) q' options
+                in goto_next q''
     in
     let q_init = f_create in
     loop grid.start [] 0 q_init
