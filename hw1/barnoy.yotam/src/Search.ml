@@ -5,41 +5,44 @@ exception No_path
 
 (* translate hash find to be exceptionless *)
 let hfind hash x = try Some(Hashtbl.find hash x) with Not_found -> None
+let qpop q = try Some(Queue.pop q) with Queue.Empty -> None
+let spop s = try Some(Stack.pop s) with Stack.Empty -> None
 
-let search f_push f_pop grid = 
+let search f_create f_push f_pop grid = 
     let hash = Hashtbl.create 100 in (* hashtable for efficiency *)
-    let rec loop loc queue cost path = 
-        let goto_next q = match f_pop q with
+    let q = f_create () in
+    let rec loop loc cost path = 
+        let goto_next () = match f_pop q with
             | None -> None
-            | Some ((next, cost, path), q') -> loop next q' cost path
+            | Some (next, cost, path) -> loop next cost path
         in
         match hfind hash loc with
-         | None -> goto_next queue (* already dealt with this node *)
-         | Some cost' -> if cost' <> cost then failwith "found duplicate!"
-            else Hashtbl.remove hash loc;
-                let new_path = loc::path in
-                if loc = grid.goal then Some (List.rev new_path, cost)
-                else
-                    let options = expand grid loc in
-                    let update_q_hash q (x, c) = 
-                        let new_cost = c + cost in
-                        match hfind hash x with 
-                         | None -> Hashtbl.add hash x new_cost; 
-                                   f_push (x, new_cost, new_path) q
-                         | Some old_cost when old_cost <= new_cost -> q
-                         | Some old_cost -> 
-                                 Hashtbl.replace hash x new_cost; 
-                                 f_push (x, new_cost, new_path) q
-                    in
-                    let queue' = List.fold_left update_q_hash queue options
-                    in goto_next queue'
+         | None -> goto_next () (* already dealt with this node *)
+         | Some cost' when cost' <> cost -> failwith "found duplicate!"
+         | Some _ ->
+            Hashtbl.remove hash loc;
+            let new_path = loc::path in
+            if loc = grid.goal then Some (List.rev new_path, cost)
+            else
+                let options = expand grid loc in
+                let update_q_hash (x, c) = 
+                    let new_cost = c + cost in
+                    match hfind hash x with 
+                     | None -> Hashtbl.add hash x new_cost; 
+                               f_push (x, new_cost, new_path) q
+                     | Some old_cost when old_cost <= new_cost -> ()
+                     | Some old_cost -> 
+                             Hashtbl.replace hash x new_cost; 
+                             f_push (x, new_cost, new_path) q
+                in
+                List.iter update_q_hash options;
+                goto_next ()
     in
-    let q_init = BatDeque.empty in
     Hashtbl.add hash grid.start 0;
-    loop grid.start q_init 0 []
+    loop grid.start 0 []
 
-let bfs = search (flip BatDeque.snoc) BatDeque.front
-let dfs = search BatDeque.cons BatDeque.front 
+let bfs = search Queue.create Queue.push qpop
+let dfs = search Stack.create Stack.push spop
 
 (* Iterative deepening depth first search *)
 (*let iddfs = *)
