@@ -3,7 +3,7 @@ open Grid
 
 exception No_path
 
-let search f_create f_push f_pop f_isempty grid = 
+let search f_push f_pop grid = 
     let rec loop loc path cost queue = 
         let goto_next q = match f_pop q with
             | None -> None
@@ -27,11 +27,11 @@ let search f_create f_push f_pop f_isempty grid =
                     (fun accq (x, c) -> f_push (x, path', cost + c) accq) q' options
                 in goto_next q''
     in
-    let q_init = f_create in
+    let q_init = BatDeque.empty in
     loop grid.start [] 0 q_init
 
-let bfs = search BatDeque.empty (flip BatDeque.snoc) BatDeque.front BatDeque.is_empty
-let dfs = search BatDeque.empty BatDeque.cons BatDeque.front BatDeque.is_empty
+let bfs = search (flip BatDeque.snoc) BatDeque.front
+let dfs = search BatDeque.cons BatDeque.front 
 
 (* Iterative deepening depth first search *)
 (*let iddfs = *)
