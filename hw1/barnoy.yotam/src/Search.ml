@@ -20,7 +20,7 @@ let search f_create f_push f_pop grid =
          | None -> goto_next () (* already dealt with this node *)
          | Some cost' when cost' <> cost -> failwith "found duplicate!"
          | Some _ ->
-            Hashtbl.remove hash loc;
+            (* Hashtbl.remove hash loc; *)
             let new_path = loc::path in
             if loc = grid.goal then Some (List.rev new_path, cost)
             else
