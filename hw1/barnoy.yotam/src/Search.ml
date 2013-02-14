@@ -3,24 +3,26 @@ open Grid
 
 exception No_path
 
+type qnode_t = Delete of loc_t | Node of loc_t * int * loc_t list
+
 (* translate hash find to be exceptionless *)
 let hfind hash x = try Some(Hashtbl.find hash x) with Not_found -> None
 let qpop q = try Some(Queue.pop q) with Queue.Empty -> None
 let spop s = try Some(Stack.pop s) with Stack.Empty -> None
 
-let search f_create f_push f_pop grid = 
+let search is_stack f_create f_push f_pop grid = 
     let hash = Hashtbl.create 100 in (* hashtable for efficiency *)
     let q = f_create () in
     let rec loop loc cost path = 
-        let goto_next () = match f_pop q with
+        let rec goto_next () = match f_pop q with
             | None -> None
-            | Some (next, cost, path) -> loop next cost path
+            | Some (Node(next, cost, path)) -> loop next cost path
+            | Some (Delete x) -> Hashtbl.remove hash x; goto_next ()
         in
         match hfind hash loc with
          | None -> goto_next () (* already dealt with this node *)
-         | Some cost' when cost' <> cost -> failwith "found duplicate!"
+         | Some cost' when cost' <> cost -> goto_next ()
          | Some _ ->
-            (* Hashtbl.remove hash loc; *)
             let new_path = loc::path in
             if loc = grid.goal then Some (List.rev new_path, cost)
             else
@@ -29,20 +31,23 @@ let search f_create f_push f_pop grid =
                     let new_cost = c + cost in
                     match hfind hash x with 
                      | None -> Hashtbl.add hash x new_cost; 
-                               f_push (x, new_cost, new_path) q
+                               f_push (Node (x, new_cost, new_path)) q
                      | Some old_cost when old_cost <= new_cost -> ()
                      | Some old_cost -> 
                              Hashtbl.replace hash x new_cost; 
-                             f_push (x, new_cost, new_path) q
+                             f_push (Node (x, new_cost, new_path)) q
                 in
-                List.iter update_q_hash options;
-                goto_next ()
+                (* only delete us once our children are done *)
+                let if_is_stack f g = if is_stack then g @: f () else f @: g () in
+                if_is_stack (fun () -> f_push (Delete loc) q)
+                            (fun () -> List.iter update_q_hash options)
+                ; goto_next ()
     in
     Hashtbl.add hash grid.start 0;
     loop grid.start 0 []
 
-let bfs = search Queue.create Queue.push qpop
-let dfs = search Stack.create Stack.push spop
+let bfs = search false Queue.create Queue.push qpop
+let dfs = search true Stack.create Stack.push spop
 
 (* Iterative deepening depth first search *)
 (*let iddfs = *)
