@@ -9,7 +9,7 @@ module Hash = Hashtbl
 type 'a qnode_t = Delete of loc_t | Node of loc_t * 'a * loc_t list
 
 (* This is our return value from the search function *)
-type 'a return_t = SomePath of 'a | NoPath | MaxDepth
+type 'a return_t = SomePath of 'a | NoPath of int | MaxDepth
 
 (* translate these functions to be exceptionless *)
 let hfind hash x = try Some(Hash.find hash x) with Not_found -> None
@@ -18,11 +18,12 @@ let spop s = try Some(S.pop s) with S.Empty -> None
 
 let search is_stack f_create f_push f_pop max_depth grid = 
     let hash = Hash.create 100 in (* hashtable for efficiency *)
+    let expanded = ref 0 in
     let q = f_create () in
     let rec loop loc cost path past_depth = 
         let rec goto_next past = match f_pop q with
             | None when past -> MaxDepth
-            | None -> NoPath
+            | None -> NoPath !expanded
             | Some (Node(next, cost, path)) -> loop next cost path past
             | Some (Delete x) -> Hash.remove hash x; goto_next past
         in
@@ -31,9 +32,10 @@ let search is_stack f_create f_push f_pop max_depth grid =
          | None, _ -> goto_next past_depth (* already dealt with this node *)
          | Some cost', _ when cost' <> cost -> goto_next past_depth
          | Some _, Some depth when List.length new_path > depth -> goto_next true
-         | Some _, _ when loc = grid.goal -> SomePath (List.rev new_path, cost)
+         | Some _, _ when loc = grid.goal -> SomePath (List.rev new_path, cost, !expanded)
          | Some _, _ ->
-            let options = expand grid loc in
+            let options = expanded := !expanded + 1; 
+                          expand grid loc in
             let update_q_hash (x, c) = 
                 let new_cost = c + cost in
                 match hfind hash x with 
@@ -63,6 +65,7 @@ let iddfs grid =
 
 let bidir grid = 
     let hash1 = Hash.create 100 in let hash2 = Hash.create 100 in 
+    let expanded = ref 0 in
     let q1 = Q.create () in let q2 = Q.create () in
     let choose a b = function 1 -> a | 2 -> b | _ -> failwith "bad value in choose" 
     in let getq = choose q1 q2 in
@@ -78,7 +81,7 @@ let bidir grid =
         (* switch off between queues and hash tables when looping *)
         let rec goto_next () = 
             match qpop otherq with
-            | None -> NoPath
+            | None -> NoPath !expanded
             | Some (Node(next, cost, path)) -> loop otheri next cost path
             | Some (Delete x) -> Hash.remove otherh x; goto_next ()
         in
@@ -89,7 +92,7 @@ let bidir grid =
         match hfind hash loc with
          | None -> goto_next ()    (* already dealt with this node *)
          | Some cost' when cost' <> cost -> goto_next ()
-         | Some _ when loc = goal        -> SomePath (List.rev new_path, cost)
+         | Some _ when loc = goal        -> SomePath (List.rev new_path, cost, !expanded)
          | Some _ -> 
              (* check for us in the other hash table *)
              match hfind otherh loc with
@@ -101,12 +104,12 @@ let bidir grid =
                  let matches = Q.fold getmatches [] otherq in
                  begin match matches with 
                   | (Node (_, _, otherp))::_ -> 
-                          SomePath(concat_path new_path otherp, other_cost + cost)
+                          SomePath(concat_path new_path otherp, other_cost + cost, !expanded)
                   | _  -> failwith "couldn't find member in queue!"
                  end
                       
              | None ->
-                let options = expand grid loc in
+                let options = expanded := !expanded + 1; expand grid loc in
                 let update_q_hash (x, c) = 
                     let new_cost = c + cost in
                     begin match hfind hash x with 
@@ -162,6 +165,7 @@ let h_linorm = h_function linorm
 
 let astar_general h_func grid debug = 
     let hash = Hashtbl.create 100 in (* to avoid adding duplicates *)
+    let expanded = ref 0 in
     let rec loop loc cost path queue = 
         if debug then print_endline @: string_of_loc loc; (* debug *)
         let goto_next q = 
@@ -171,15 +175,15 @@ let astar_general h_func grid debug =
                 let q' = PQ.del_min q in 
                 Hash.remove hash next;
                 loop next next_cost next_path q'
-            | None -> NoPath (* empty q *)
+            | None -> NoPath !expanded (* empty q *)
             | _ -> failwith "invalid value in hstar goto_next!"
             end
         in
         let new_path = loc::path in
-        if loc = grid.goal then SomePath (List.rev new_path, cost)
+        if loc = grid.goal then SomePath (List.rev new_path, cost, !expanded)
         else if List.exists ((=) loc) path then goto_next queue
         else 
-            let options = expand grid loc in
+            let options = expanded := !expanded + 1; expand grid loc in
             let update_q accq (x, c) = 
                 let new_cost = c + cost in
                 let new_hval = h_func x new_cost grid in
@@ -195,5 +199,5 @@ let astar_general h_func grid debug =
     let q = PQ.empty in
     loop grid.start 0 [] q
 
-let astar = astar_general h_l2norm
+let astar = astar_general h_l1norm
 

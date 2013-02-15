@@ -35,24 +35,25 @@ let do_search file search =
       | IDDFS -> iddfs g
       | BIDIR -> bidir g
       | ASTAR -> astar g !debug_search
-    in let path, cost = match result with
-      | SomePath (path, cost) -> (path, cost)
-      | NoPath -> ([], -1)
+    in let path, cost, expanded = match result with
+      | SomePath (path, cost, expanded) -> (path, cost, expanded)
+      | NoPath expanded -> ([], -1, expanded)
       | _ -> failwith "Received bad value"
     in let dirs_str = string_of_dirs @: dirs_of_locs path in
     let g_final = set_squares g Path path in
     let g_str = string_of_grid g_final in
-    dirs_str, cost, g_str
+    dirs_str, cost, expanded, g_str
 
 let main () =
     parse_cmd_line ();
     if !target_file = "" then (Arg.usage param_specs usage_msg;
         error "\nNo input file specified");
-    let dirs_str, cost, g_str = do_search !target_file !search_method in
+    let dirs_str, cost, expanded, g_str = do_search !target_file !search_method in
     print_endline dirs_str;
+    if !show_graph then print_string @: "\n"^g_str^"\n";
     print_endline @: "cost: "^ (match cost with -1 -> "infinite" | _ ->
         string_of_int cost);
-    if !show_graph then print_string @: "\n"^g_str^"\n"
+    print_endline @: "expanded: "^ string_of_int expanded
 
 let _ = main ()
 
