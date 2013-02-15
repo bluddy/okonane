@@ -1,26 +1,30 @@
 open Util
 open Grid
 
+module Q = Queue
+module S = Stack
+module Hash = Hashtbl
+
 (* This is the type of node we store in our queue *)
-type qnode_t = Delete of loc_t | Node of loc_t * int * loc_t list
+type 'a qnode_t = Delete of loc_t | Node of loc_t * 'a * loc_t list
 
 (* This is our return value from the search function *)
 type 'a return_t = SomePath of 'a | NoPath | MaxDepth
 
 (* translate these functions to be exceptionless *)
-let hfind hash x = try Some(Hashtbl.find hash x) with Not_found -> None
-let qpop q = try Some(Queue.pop q) with Queue.Empty -> None
-let spop s = try Some(Stack.pop s) with Stack.Empty -> None
+let hfind hash x = try Some(Hash.find hash x) with Not_found -> None
+let qpop q = try Some(Q.pop q) with Q.Empty -> None
+let spop s = try Some(S.pop s) with S.Empty -> None
 
 let search is_stack f_create f_push f_pop max_depth grid = 
-    let hash = Hashtbl.create 100 in (* hashtable for efficiency *)
+    let hash = Hash.create 100 in (* hashtable for efficiency *)
     let q = f_create () in
     let rec loop loc cost path past_depth = 
         let rec goto_next past = match f_pop q with
             | None when past -> MaxDepth
             | None -> NoPath
             | Some (Node(next, cost, path)) -> loop next cost path past
-            | Some (Delete x) -> Hashtbl.remove hash x; goto_next past
+            | Some (Delete x) -> Hash.remove hash x; goto_next past
         in
         let new_path = loc::path in
         match (hfind hash loc, max_depth) with
@@ -35,7 +39,7 @@ let search is_stack f_create f_push f_pop max_depth grid =
                 match hfind hash x with 
                  | Some old_cost when old_cost <= new_cost -> ()
                  | Some _ | None -> 
-                         Hashtbl.replace hash x new_cost; 
+                         Hash.replace hash x new_cost; 
                          f_push (Node (x, new_cost, new_path)) q
             in
             (* only delete us once our children are done *)
@@ -44,13 +48,13 @@ let search is_stack f_create f_push f_pop max_depth grid =
                         (fun () -> List.iter update_q_hash options)
             ; goto_next past_depth
     in
-    Hashtbl.add hash grid.start 0;
+    Hash.add hash grid.start 0;
     loop grid.start 0 [] false
 
-let bfs = search false Queue.create Queue.push qpop None
-let dfs = search true Stack.create Stack.push spop None
+let bfs = search false Q.create Q.push qpop None
+let dfs = search true S.create S.push spop None
 let iddfs grid = 
-    let search' = search true Stack.create Stack.push spop in
+    let search' = search true S.create S.push spop in
     let rec loop i = 
         match search' (Some i) grid with
          | MaxDepth -> loop @: i+1
@@ -58,8 +62,8 @@ let iddfs grid =
     in loop 1
 
 let bidir grid = 
-    let hash1 = Hashtbl.create 100 in let hash2 = Hashtbl.create 100 in 
-    let q1 = Queue.create () in let q2 = Queue.create () in
+    let hash1 = Hash.create 100 in let hash2 = Hash.create 100 in 
+    let q1 = Q.create () in let q2 = Q.create () in
     let choose a b = function 1 -> a | 2 -> b | _ -> failwith "bad value in choose" 
     in let getq = choose q1 q2 in
     let geth = choose hash1 hash2 in
@@ -76,7 +80,7 @@ let bidir grid =
             match qpop otherq with
             | None -> NoPath
             | Some (Node(next, cost, path)) -> loop otheri next cost path
-            | Some (Delete x) -> Hashtbl.remove otherh x; goto_next ()
+            | Some (Delete x) -> Hash.remove otherh x; goto_next ()
         in
         let new_path = loc::path in
         let concat_path localp otherp = choose 
@@ -94,7 +98,7 @@ let bidir grid =
                    | (Node (l, c, _)) as x when l = loc && c = other_cost -> x::acc
                    | _ -> acc 
                  end in
-                 let matches = Queue.fold getmatches [] otherq in
+                 let matches = Q.fold getmatches [] otherq in
                  begin match matches with 
                   | (Node (_, _, otherp))::_ -> 
                           SomePath(concat_path new_path otherp, other_cost + cost)
@@ -108,17 +112,88 @@ let bidir grid =
                     begin match hfind hash x with 
                      | Some old_cost when old_cost <= new_cost -> ()
                      | Some _ | None -> 
-                             Hashtbl.replace hash x new_cost; 
-                             Queue.push (Node (x, new_cost, new_path)) q
+                             Hash.replace hash x new_cost; 
+                             Q.push (Node (x, new_cost, new_path)) q
                     end
                 in
                 (* only delete us once our children are done *)
                 List.iter update_q_hash options;
-                Queue.push (Delete loc) q;
+                Q.push (Delete loc) q;
                 goto_next ()
     in
-    Hashtbl.add hash1 grid.start 0;
-    Hashtbl.add hash2 grid.goal 0;
-    Queue.push (Node (grid.goal, 0, [])) q2;
+    Hash.add hash1 grid.start 0;
+    Hash.add hash2 grid.goal 0;
+    Q.push (Node (grid.goal, 0, [])) q2;
     loop 1 grid.start 0 []
+
+(* create an ordering to be able to use the Heap *)
+module PriorityOrder (*: BatInterfaces.OrderedType *)= 
+struct
+    type t = (float * int) qnode_t (* h, cost *)
+    let compare n1 n2 = match (n1, n2) with
+      | Node (_, (h1, _), _), Node (_, (h2, _), _) when h1 > h2 -> 1
+      | Node (_, (h1, _), _), Node (_, (h2, _), _) when h1 = h2 -> 0
+      | Node (_, (h1, _), _), Node (_, (h2, _), _) when h1 < h2 -> -1
+      | _ -> failwith "bad values in priority queue!"
+end
+
+(* make the heap use our ordering *)
+module PQ = BatHeap.Make(PriorityOrder)
+
+(* make the priority queue find_min exceptionless *)
+let pq_min q = try Some(PQ.find_min q) with Invalid_argument _ -> None
+
+let l2norm (x,y) (dest_x, dest_y) = 
+    let dx = dest_x - x in let dy = dest_y - y in
+    sqrt @: float_of_int @: dx * dx + dy * dy
+
+let l1norm (x, y) (dest_x, dest_y) =
+    let dx = dest_x - x in let dy = dest_y - y in
+    float_of_int @: abs @: dx + dy
+
+let linorm (x, y) (dest_x, dest_y) = 
+    let dx = dest_x - x in let dy = dest_y - y in
+    float_of_int @: max dx dy
+
+let h_function f loc cost grid = (float_of_int cost) +. f loc grid.goal
+let h_l1norm = h_function l1norm
+let h_l2norm = h_function l2norm
+let h_linorm = h_function linorm
+
+let astar_general h_func grid debug = 
+    let hash = Hashtbl.create 100 in (* to avoid adding duplicates *)
+    let rec loop loc cost path queue = 
+        if debug then print_endline @: string_of_loc loc; (* debug *)
+        let goto_next q = 
+            begin match pq_min q with
+            | Some(Node(next, (hval, next_cost), next_path)) -> 
+                if debug then print_endline @: string_of_float hval;
+                let q' = PQ.del_min q in 
+                Hash.remove hash next;
+                loop next next_cost next_path q'
+            | None -> NoPath (* empty q *)
+            | _ -> failwith "invalid value in hstar goto_next!"
+            end
+        in
+        let new_path = loc::path in
+        if loc = grid.goal then SomePath (List.rev new_path, cost)
+        else if List.exists ((=) loc) path then goto_next queue
+        else 
+            let options = expand grid loc in
+            let update_q accq (x, c) = 
+                let new_cost = c + cost in
+                let new_hval = h_func x new_cost grid in
+                match hfind hash x with 
+                 | Some old_hval when old_hval <= new_hval -> accq
+                 | Some _ | None -> 
+                     Hash.replace hash x new_hval; 
+                     PQ.insert accq @: Node (x, (new_hval, new_cost), new_path)
+            in
+            let q' = List.fold_left update_q queue options in
+            goto_next q'
+    in
+    let q = PQ.empty in
+    loop grid.start 0 [] q
+
+let astar = astar_general h_l2norm
 

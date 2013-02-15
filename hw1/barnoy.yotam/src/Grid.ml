@@ -11,6 +11,8 @@ type square_t =
 
 type loc_t = (int * int)  (* x, y *)
 
+let string_of_loc (x, y) = "("^string_of_int x^", "^string_of_int y^")"
+
 type grid_data_t = (square_t array) array
 
 type grid_t = { size : (int * int);
