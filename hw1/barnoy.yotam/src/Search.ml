@@ -60,8 +60,8 @@ let iddfs grid =
 let bidir grid = 
     let hash1 = Hashtbl.create 100 in let hash2 = Hashtbl.create 100 in 
     let q1 = Queue.create () in let q2 = Queue.create () in
-    let choose a b = function 1 -> a | 2 -> b in
-    let getq = choose q1 q2 in
+    let choose a b = function 1 -> a | 2 -> b | _ -> failwith "bad value in choose" 
+    in let getq = choose q1 q2 in
     let geth = choose hash1 hash2 in
     let getgoal = choose grid.goal grid.start in
     let alt = choose 2 1 in
@@ -70,18 +70,17 @@ let bidir grid =
         (* the current hash & q *)
         let hash = geth i in let q = getq i in let goal = getgoal i in
         (* the other hash & q *)
-        let otheri = alt i in let otherq = getq otheri in otherh = geth otheri in
+        let otheri = alt i in let otherq = getq otheri in let otherh = geth otheri in
         (* switch off between queues and hash tables when looping *)
         let rec goto_next () = 
             match qpop otherq with
             | None -> NoPath
-            | Some (Node(next, cost, path)) -> loop otheri next cost path past
+            | Some (Node(next, cost, path)) -> loop otheri next cost path
             | Some (Delete x) -> Hashtbl.remove otherh x; goto_next ()
         in
         let new_path = loc::path in
-        let concat_path localp localc otherp otherc = match i with 
-            | 1 -> SomePath((List.rev localp) @ otherp, localc + otherc)
-            | 2 -> SomePath((List.rev otherp) @ localp, localc + otherc)
+        let concat_path localp otherp = choose 
+            ((List.rev localp) @ otherp) ((List.rev otherp) @ localp) i
         in
         match hfind hash loc with
          | None -> goto_next ()    (* already dealt with this node *)
@@ -91,32 +90,35 @@ let bidir grid =
              (* check for us in the other hash table *)
              match hfind otherh loc with
              | Some other_cost -> 
-                 let getmatches acc = function
-                   | (Node (l, c, p)) as x when l = loc && c = other_cost -> x::acc
-                   | _ -> acc in
+                 let getmatches acc = begin function
+                   | (Node (l, c, _)) as x when l = loc && c = other_cost -> x::acc
+                   | _ -> acc 
+                 end in
                  let matches = Queue.fold getmatches [] otherq in
-                 match matches with 
+                 begin match matches with 
                   | (Node (_, _, otherp))::_ -> 
-                          concat_path path cost otherp other_cost 
+                          SomePath(concat_path new_path otherp, other_cost + cost)
                   | _  -> failwith "couldn't find member in queue!"
+                 end
                       
              | None ->
                 let options = expand grid loc in
                 let update_q_hash (x, c) = 
                     let new_cost = c + cost in
-                    match hfind hash x with 
+                    begin match hfind hash x with 
                      | Some old_cost when old_cost <= new_cost -> ()
                      | Some _ | None -> 
                              Hashtbl.replace hash x new_cost; 
                              Queue.push (Node (x, new_cost, new_path)) q
+                    end
                 in
                 (* only delete us once our children are done *)
                 List.iter update_q_hash options;
-                f_push (Delete loc) q;
+                Queue.push (Delete loc) q;
                 goto_next ()
     in
     Hashtbl.add hash1 grid.start 0;
     Hashtbl.add hash2 grid.goal 0;
     Queue.push (Node (grid.goal, 0, [])) q2;
-    loop grid.start 0 []
+    loop 1 grid.start 0 []
 

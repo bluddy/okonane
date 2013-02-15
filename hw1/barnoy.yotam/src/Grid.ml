@@ -127,7 +127,7 @@ let dirs_of_locs locs =
              | 0, 1  -> loc, Down::acc
              | 1, 0  -> loc, Right::acc
              | -1, 0 -> loc, Left::acc
-             | _     -> invalid_arg "Improper movement"
+             | x, y  -> invalid_arg @: "Improper movement: "^string_of_int x^" "^string_of_int y
             end in
         List.rev @: snd @: List.fold_left dir_of_loc (List.hd locs, []) @: 
             List.tl locs

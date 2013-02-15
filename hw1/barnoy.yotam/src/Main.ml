@@ -5,7 +5,7 @@ open Arg
 
 let error s = prerr_endline s; exit 1
 
-type search_t = BFS | DFS | IDDFS
+type search_t = BFS | DFS | IDDFS | BIDIR
 
 let search_method = ref BFS
 let target_file = ref ""
@@ -15,7 +15,8 @@ let param_specs = Arg.align
     [
         "-bfs", Arg.Unit (fun () -> search_method := BFS), " Use BFS search";
         "-dfs", Arg.Unit (fun () -> search_method := DFS), " Use DFS search";
-        "-iddfs", Arg.Unit (fun () -> search_method := IDDFS), " Use IDDFS search";
+        "-iddfs", Arg.Unit (fun () -> search_method := IDDFS), " Use incremental DFS";
+        "-bidir", Arg.Unit (fun () -> search_method := BIDIR), " Use bi-directional search";
         "-g"  , Arg.Set  show_graph, " Show result graph";
     ]
 
@@ -29,6 +30,7 @@ let do_search file search =
       | BFS -> bfs g
       | DFS -> dfs g
       | IDDFS -> iddfs g
+      | BIDIR -> bidir g
     in let path, cost = match result with
       | SomePath (path, cost) -> (path, cost)
       | NoPath -> ([], -1)
