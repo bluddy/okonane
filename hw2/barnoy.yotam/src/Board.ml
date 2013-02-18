@@ -92,9 +92,9 @@ let move_of_2_pos ((x1,y1) as pos) (x2,y2) =
   match x2-x1, y2-y1 with
    | 0, y when y mod 2 <> 0 -> None (* must be even *)
    | 0, y when y > 0        -> Some(Move(pos, (Down, y)))
-   | 0, y when y < 0        -> Some(Move(pos, (Up, y)))
+   | 0, y when y < 0        -> Some(Move(pos, (Up, -y)))
    | x, 0 when x > 0        -> Some(Move(pos, (Right, x)))
-   | x, 0 when x < 0        -> Some(Move(pos, (Left, x)))
+   | x, 0 when x < 0        -> Some(Move(pos, (Left, -x)))
    | _ -> None
 
 (* generic fold over the grid. Takes a function given acc ((i,j),x) *)
