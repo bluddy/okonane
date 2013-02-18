@@ -1,0 +1,27 @@
+### Starting build.
+# Target: Main.ml.depends, tags: { extension:ml, file:Main.ml, ocaml, ocamldep, quiet, traverse, use_str }
+/opt/local/bin/ocamldep.opt -modules Main.ml > Main.ml.depends # cached
+# Target: Board.ml.depends, tags: { extension:ml, file:Board.ml, ocaml, ocamldep, quiet, traverse, use_str }
+/opt/local/bin/ocamldep.opt -modules Board.ml > Board.ml.depends
+# Target: Util.ml.depends, tags: { extension:ml, file:Util.ml, ocaml, ocamldep, quiet, traverse, use_str }
+/opt/local/bin/ocamldep.opt -modules Util.ml > Util.ml.depends # cached
+# Target: Util.cmo, tags: { byte, compile, extension:cmo, extension:ml, file:Util.cmo, file:Util.ml, implem, ocaml, quiet, traverse, use_str }
+/opt/local/bin/ocamlc.opt -c -I Batteries -o Util.cmo Util.ml # cached
+# Target: Game.ml.depends, tags: { extension:ml, file:Game.ml, ocaml, ocamldep, quiet, traverse, use_str }
+/opt/local/bin/ocamldep.opt -modules Game.ml > Game.ml.depends # cached
+# Target: Board.cmo, tags: { byte, compile, extension:cmo, extension:ml, file:Board.cmo, file:Board.ml, implem, ocaml, quiet, traverse, use_str }
+/opt/local/bin/ocamlc.opt -c -I Batteries -o Board.cmo Board.ml
++ /opt/local/bin/ocamlc.opt -c -I Batteries -o Board.cmo Board.ml
+File "Board.ml", line 176, characters 4-5:
+Warning 11: this match case is unused.
+File "Board.ml", line 184, characters 6-7:
+Warning 26: unused variable g.
+File "Board.ml", line 218, characters 6-7:
+Warning 26: unused variable g.
+# Target: Game.cmo, tags: { byte, compile, extension:cmo, extension:ml, file:Game.cmo, file:Game.ml, implem, ocaml, quiet, traverse, use_str }
+/opt/local/bin/ocamlc.opt -c -I Batteries -o Game.cmo Game.ml
++ /opt/local/bin/ocamlc.opt -c -I Batteries -o Game.cmo Game.ml
+File "Game.ml", line 12, characters 21-22:
+Error: Unbound value b
+Command exited with code 2.
+# Compilation unsuccessful.
