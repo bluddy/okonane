@@ -12,16 +12,16 @@ type move_t = Remove of int * int
 type board_t = { size:int; 
                 grid:square_t array array; }
 
-
-let full_length size = size * size
-
 let make_default size = 
   let check_size = function 4 | 6 | 8 -> true | _ -> false in
   if not @: check_size size then None
   else 
-    let r = create_range 1 (size*size/2) in
-    let bwlist = List.flatten @: list_map (fun _ -> [Black; White]) r in
-    let board_list = list_bunch size bwlist in
+    let r = create_range 1 (size*size/4) in
+    let half_list a b = 
+      let bwlist = List.flatten @: list_map (fun _ -> [a; b]) r in
+      list_bunch size bwlist in
+    let board_list = 
+      list_intersperse (half_list Black White) (half_list White Black) in
     let larray = List.map (fun l -> Array.of_list l) board_list in
     let garray = Array.of_list larray in
     Some {size=size; grid=garray}
@@ -33,6 +33,21 @@ let string_of_square = function
   | White -> "w"
   | Empty -> " "
 
+let string_of_dir = function
+  | Up -> "up" | Down -> "down" | Left -> "left" | Right -> "right"
+
+let string_of_pos (x,y) = "("^string_of_int x^", "^string_of_int y^")"
+
+let string_of_move = function
+  | Remove (a,b) -> "Remove "^string_of_pos (a,b)
+  | Move ((x,y),(dir,i)) -> "Move "^
+    string_of_pos (x,y)^" "^string_of_int i^" "^string_of_dir dir
+
+
+
+let full_length size = size * size
+
+
 let abc = ["a";"b";"c";"d";"e";"f";"g";"h"]
 
 let string_of_board b = 
@@ -42,8 +57,8 @@ let string_of_board b =
 
 (* string of the board, overlaid with specific positions and their strings *)
 (* the list is of the form: [(pos, string)] *) 
-let string_of_board_and_coords b str_l =
-  let top_coord_line = String.concat " " @: list_take b.size abc in
+let string_of_board_and_coords b =
+  let top_coord_line = "   "^String.concat " " @: list_take b.size abc in
   let string_of_line (i,l) = 
     string_of_int i^
       " |"^(String.concat "|" @: array_map string_of_square l)^"|"
@@ -58,7 +73,7 @@ let string_of_board_and_coords b str_l =
 let pos_of_str str =
   let abc_i = insert_index_snd 0 abc in
   let len = String.length str in
-  if len <> 2 then invalid_arg "Coords must be 2 chars long"
+  if len <> 2 then None
   else 
     let s1 = String.sub str 0 1 and s2 = String.sub str 1 1 in
     let interpret a b = 
@@ -84,14 +99,14 @@ let move_of_2_pos ((x1,y1) as pos) (x2,y2) =
 
 (* generic fold over the grid. Takes a function given acc ((i,j),x) *)
 let fold f acc b =
-  snd @: snd @: 
+  snd @: 
     Array.fold_left
       (fun (j, accj) l -> 
         let res = Array.fold_left
           (fun (i, acci) x -> i+1, f acci ((i,j),x))
-          accj l
-        in j+1, res)
-      (0, (0, acc)) b.grid
+          (0, accj) l
+        in j+1, snd res)
+      (0, acc) b.grid
 
 (* get a list of squares of a specific type *)
 let get_squares b sq = 
@@ -108,7 +123,9 @@ let pos_in_board b (x,y) = match b.size with
 (* limit positions to those on the board *)
 let clamp_to_board b l = List.filter (pos_in_board b) l
 
-let lookup b (x,y) = (b.grid.(y)).(x)
+let lookup b (x,y) = 
+  try (b.grid.(y)).(x) with Invalid_argument a -> 
+   invalid_arg @: a^"("^string_of_int x^","^string_of_int y^")"
 
 let set b sq (x,y) = (b.grid.(y)).(x) <- sq
 
@@ -173,79 +190,60 @@ let expand b turn =
         let matches = loop [] adjs in
         List.map (fun ((x,y),(d,i)) -> Move ((x,y),(d,i))) matches
 
-  | _ -> invalid_arg "Bad input to expand function"
-
 let valid_move b turn move = 
   let moves = expand b turn in
   List.exists ((=) move) moves
 
-(* play a move on a board, modifying the board *)
-let play b turn move = 
-  let g = b.grid in
+(* unified logic for rewinding/playing a move on the board *)
+let play_rewind rewind b turn move = 
   let toplay = color_of_turn turn in
   match move with
    | Remove (x,y) | Move ((x,y), _) when not (pos_in_board b (x,y)) -> 
        invalid_arg "Position out of bounds"
    | Remove (x,y) -> let pos = x,y in
-       begin match lookup b pos with
+     begin if rewind then
+       match lookup b pos with
+       | Empty -> set b toplay pos; ()
+       | _ -> invalid_arg "Cannot rewind remove on non-Empty"
+     else (* play *)
+       match lookup b pos with
        | Empty -> invalid_arg "Cannot play move on Empty"
        | x when x <> toplay -> invalid_arg "Wrong color being removed"
        | _ -> set b Empty pos; ()
-       end
+     end
    | Move (_, (_,i)) when i < 2 || i mod 2 != 0 -> 
        invalid_arg "Move amount must be even integer >= 2"
-   | Move (pos, (dir, num)) ->
-      begin match lookup b pos with
-       | Empty -> invalid_arg "Cannot play remove on empty"
-       | color when color <> toplay -> invalid_arg "Color mismatch"
-       | color ->
-           let r = create_range 2 ~step:2 (num/2) in
-           let otherc = other_color color in
-           set b Empty pos;
-           let modify i = 
-             let pos1 = apply_dir pos (dir, i-1) in
-             let pos2 = apply_dir pos (dir, i) in
-             begin match lookup b pos1, lookup b pos2 with
-              | c, Empty when c = otherc -> 
-                  set b Empty pos1; 
-                  if i = num then set b color pos2; ()
-              | _ -> failwith "Bad board configuration" end 
-           in List.iter modify r
-      end
+   | Move (p, (d, num)) ->
+      let do_move pos dir =
+        begin match lookup b pos with
+         | Empty -> invalid_arg @:
+             "Cannot"^(if rewind then "rewind" else "play")^ " move on empty"
+         | color when color <> toplay -> invalid_arg "Color mismatch"
+         | color ->
+             let r = create_range 2 ~step:2 (num/2) in
+             let otherc = other_color color in
+             set b Empty pos;
+             let modify i = 
+               let pos1 = apply_dir pos (dir, i-1) in
+               let pos2 = apply_dir pos (dir, i) in
+               let set_pos () = 
+                 set b Empty pos1; 
+                 if i = num then set b color pos2; () in
+               begin match rewind, lookup b pos1, lookup b pos2 with
+                | false, c, Empty when c = otherc -> set_pos ()
+                | true, Empty, Empty -> set_pos ()
+                | _ -> failwith "Bad board configuration" end 
+             in List.iter modify r
+        end in 
+      if rewind then 
+        let pos = apply_dir p (d, num)  in
+        let dir = rev_dir d in
+        do_move pos dir
+      else (* play *)
+        do_move p d
 
+
+(* play a move on a board, modifying the board *)
+let play = play_rewind false
 (* rewind a move on a board, restoring the board to the way it was *)
-let rewind b turn move =
-  let g = b.grid in
-  let toplay = color_of_turn turn in
-  match move with
-   | Remove (x,y) | Move ((x,y), _) when not @: pos_in_board b (x,y) -> 
-       invalid_arg "Position out of bounds"
-   | Remove (x,y) -> let pos = (x,y) in
-       begin match lookup b pos with
-       | Empty -> set b toplay pos; ()
-       | _ -> invalid_arg "Cannot rewind remove on non-Empty"
-       end
-
-   | Move (_, (_,i)) when i < 2 || i mod 2 != 0 -> 
-       invalid_arg "Move amount must be even integer >= 2"
-   | Move (pos', (dir', num)) ->
-      let pos = apply_dir pos' (dir', num)  in
-      let dir = rev_dir dir' in
-      begin match lookup b pos with
-       | Empty -> invalid_arg "Cannot rewind move on empty"
-       | color when color <> toplay -> invalid_arg "Color mismatch"
-       | color ->
-           let r = create_range 2 ~step:2 (num/2) in
-           let otherc = other_color color in
-           set b Empty pos;
-           let modify i = 
-             let pos1 = apply_dir pos (dir, i-1) in
-             let pos2 = apply_dir pos (dir, i) in
-             begin match lookup b pos1, lookup b pos2 with
-              | Empty, Empty -> 
-                  set b otherc pos1; 
-                  if i = num then set b color pos2; ()
-              | _ -> failwith "Bad board configuration" end 
-           in List.iter modify r
-      end
-
+let rewind = play_rewind true

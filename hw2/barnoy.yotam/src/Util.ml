@@ -72,7 +72,7 @@ let create_range ?(step=1) first length =
     List.rev(range_inner first [])
 
 (* make a range that corresponds to a given list *)
-let create_corr_range first xs = create_range 0 @: List.length xs
+let create_corr_range first xs = create_range first @: List.length xs
 
 let insert_index_fst first xs = 
     let is = create_corr_range first xs in
@@ -97,6 +97,15 @@ let list_bunch i l =
       | []    -> taken::acc
       | xs    -> loop (taken::acc) xs
   in List.rev @: loop [] l
+
+(* intersperse 2 lists together. When one runs out, continue with the other *)
+let list_intersperse la lb =
+  let rec loop acc l1 l2 = match l1, l2 with
+    | x::xs, y::ys -> loop (y::x::acc) xs ys
+    | x::xs, []    -> loop (x::acc) xs []
+    | [],    y::ys -> loop (y::acc) [] ys
+    | [], []       -> acc
+  in List.rev @: loop [] la lb
     
 (* flatten a list, removing option elements *)
 let flatten_option l = List.filter (function None -> false | Some _ -> true) l
