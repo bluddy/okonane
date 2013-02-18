@@ -8,3 +8,5 @@
 *.byte
 *.native
 _build/
+bin/
+output/
