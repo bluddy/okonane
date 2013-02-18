@@ -13,10 +13,20 @@ let debug = ref false
 
 let string_of_color = function BlackP -> "Black" | WhiteP -> "White"
 let color_of_turn t = match t mod 2 with 0 -> WhiteP | _ -> BlackP
+let other_color = function WhiteP -> BlackP | BlackP -> WhiteP
 
-let rec player_turn s =
-  let moves = expand s.board s.turn in
-  if !debug then List.iter (print_endline |- string_of_move) moves;
+let set_debug debug_flag = debug := debug_flag; ()
+
+let rec next_turn f olds =
+  let s = {olds with turn = olds.turn + 1} in
+  match expand s.board s.turn with
+   | [] -> let c = other_color @: color_of_turn s.turn in
+           print_endline @: (string_of_color c)^" Wins!";
+           start_game ()
+   | moves -> if !debug then List.iter (print_endline |- string_of_move) moves;
+              f s moves
+
+and player_turn s moves =
   let board_str = string_of_board_and_coords s.board in
   let rec loop_player () = 
     let invalid_move () = print_endline "Invalid move\n"; loop_player () in
@@ -33,9 +43,7 @@ let rec player_turn s =
     in
     let play_move m =
        if List.exists ((=) m) moves then 
-         let new_s = {s with turn = s.turn + 1} in
-         play s.board s.turn m;
-         ai_turn new_s
+         (play s.board s.turn m; next_turn ai_turn s)
        else invalid_move ()
     in match s.turn with
      | 1 | 2 ->
@@ -52,10 +60,9 @@ let rec player_turn s =
        end
   in loop_player ()
 
-and ai_turn s = player_turn s
-       
-let start_game debug_flag =
-  debug := debug_flag;
+and ai_turn s moves = next_turn player_turn s
+
+and start_game () =
   print_endline "Welcome to Konane!\n";
   let rec board_loop () : board_t =
     print_string "How big of a board would you like? (4/6/8)";
@@ -76,5 +83,5 @@ let start_game debug_flag =
     with Failure _ -> bw_loop () in
   let bw_choice = bw_loop () in
   let f = match bw_choice with BlackP -> player_turn | WhiteP -> ai_turn in
-  f {board=board; player=bw_choice; turn=1}
+  next_turn f {board=board; player=bw_choice; turn=0}
 

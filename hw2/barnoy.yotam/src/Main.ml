@@ -13,7 +13,8 @@ let parse_cmd_line () = Arg.parse param_specs (fun str -> ()) ""
 
 let main () = 
   parse_cmd_line ();
-  start_game !debug
+  set_debug !debug;
+  start_game ()
 
 let _ = main ()
 
