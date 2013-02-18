@@ -108,6 +108,23 @@
 	       child{node{Library}
 		      child{node{Kitchen}}}}};
 	\end{tikzpicture}
+
+\item Results:\\
+	\begin{center} 
+		\begin{tabular}{|c|c|c|c| c|c|c|c| c|c|c|c| c|}
+			\hline
+			& \textbf{BFS:} & nodes & time & cost & \textbf{DFS:} & nodes & time & cost & \textbf{A*:} & nodes & time & cost \\ \hline
+			Map 1 &         & 7     & 1ms  & 7    &               & 7     & 2ms  & 7    &              & 7     & 1ms  & 7    \\ \hline
+			Map 2 &         & 14    & 1ms  & 7    &               & 14    & 1ms  & 14   &              & 14    & 1ms  & 14   \\ \hline
+			Map 3 &         & 31    & 1ms  & 14   &               & 31    & 1ms  & 14   &              & 25    & 1ms  & 14   \\ \hline
+			Map 4 &         & 23    & 1ms  & 14   &               & 22    & 1ms  & 18   &              & 24    & 1ms  & 14   \\ \hline
+			Map 5 &         & 108   & 2ms  & 15   &               & 29    & 1ms  & 31   &              & 100   & 2ms  & 15   \\ \hline
+			Map 6 &         & 979799 & 4.4s & 10090 &             & -     & 21m+  & -     &            & -     & TO & -    \\ \hline
+			Map 7 &         & 38    & 2ms  & inf  &               & 46    & 1ms  & inf  &              & 41    & 1ms  & inf  \\ \hline
+			Map 8 &         & 22    & 1ms  & 21   &               & 13    & 1ms  & 21   &              & 17    & 1ms  & 15   \\ \hline
+	    \end{tabular} 
+    \end{center} 
+
 \item I used the A* heuristic of Manhattan distance or L1-norm. This heuristic is admissible because the agent can only move in 4 directions, and therefore needs to make at least the number of moves that Manhatten distance indicates. Therefore, the L1-norm can never be more than than the remaining cost of the solution -- it's optimistic and admissible. 
 
 The main issue is handling map 6. I thought that A* would easily find the way to the goal, but it turns out that it's just not the case. Because the algorithm is optimal and complete, it must consider every cheaper way to get to the goal, which in map 6 means trying out every square in the grid that's closer to the start first. This is what happened with using the L2-norm. Using L1-norm, the case of map 6 is no better than DFS -- the cost of every square is the same, since the heuristic function raises f(n) to be the distance to the goal. But at least we're not first covering every square that's closer to the start point. I think Manhattan distance is as good as we can get since it's the highest we can push h(n) while still being admissible.

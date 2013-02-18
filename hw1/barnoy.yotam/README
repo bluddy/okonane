@@ -1,3 +1,36 @@
-Aritificial Intelligence HW 1
+Aritificial Intelligence HW 1: Search
 
 Yotam Barnoy
+
+Files:
+------
+_tags         - Used by the ocamlbuild system.
+run.sh        - Runs bin/Main.native
+compile.sh    - Compiles using the ocamlbuild system.
+src/Main.ml   - The main file of the program. Calls the search function.
+src/Grid.ml   - Handles all grid-related functionality.
+src/Search.ml - contains a function for each type of search
+src/Util.ml   - Different utility functions that I've personally written. These copy some of Haskell's API functionality.
+src/Batteries - Contains data structure implementations from batteriesincluded.org
+			    (ocaml lacks a rich API and so I borrowed some data structures from the biggest source of ocaml libraries without including the whole library)
+src/Batteries/batHeap.ml - Batteries Included' implementation of a binomial heap.
+src/Batteries/batInterfaces.ml - interface needed to create flexible instances of Batteries Included data structures.
+doc/hw1.tex   - Latex file for the written part of the homework.
+doc/hw1.pdf   - PDF file
+
+To build: run compile.sh. This will invoke the ocamlbuild system.
+To run: run run.sh. The possible parameters will be presented.
+
+Run times and algorithm details
+-------------------------------
+Every problem instance except for map6.txt runs in 1-2ms using every algorithm.
+
+Map6.txt can be handled by BFS-like algorithms (ie. also bi-directional search) because they map out the full graph and look it up in a hashtable. Every other algorithm is unable to cope with map6 in the time I've tried to measure it. I could have kept information about every node in a hashtable for A* and for DFS, but that would defeat their purpose. I'm not sure if any other algorithm but BFS was supposed to be able to finish map6, but it makes sense to me that they take a very very long time. Actually, I was surprised at how poorly A* did, but now that I've learned more about it, it makes sense as well.
+
+Nevertheless, both DFS and A* use hashtables as well. DFS keeps every node it's seen in the past branch (loop detection) in a hashtable for amortized O(1) lookup, and A* uses a hashtable to make sure it's not re-adding a square of equal cost to its priority queue. 
+
+
+
+
+
+
