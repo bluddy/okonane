@@ -28,6 +28,8 @@ let make_default size =
 
 (* ----- String representation ----- *)
 
+let abc = ["a";"b";"c";"d";"e";"f";"g";"h"]
+
 let string_of_square = function
   | Black -> "b"
   | White -> "w"
@@ -38,17 +40,12 @@ let string_of_dir = function
 
 let string_of_pos (x,y) = "("^string_of_int x^", "^string_of_int y^")"
 
+let abc_of_pos (x,y) = List.nth abc x^string_of_int (y + 1)
+
 let string_of_move = function
   | Remove (a,b) -> "Remove "^string_of_pos (a,b)
   | Move ((x,y),(dir,i)) -> "Move "^
     string_of_pos (x,y)^" "^string_of_int i^" "^string_of_dir dir
-
-
-
-let full_length size = size * size
-
-
-let abc = ["a";"b";"c";"d";"e";"f";"g";"h"]
 
 let string_of_board b = 
   let string_of_line l = 
@@ -97,6 +94,16 @@ let move_of_2_pos ((x1,y1) as pos) (x2,y2) =
    | x, 0 when x < 0        -> Some(Move(pos, (Left, -x)))
    | _ -> None
 
+let apply_dir (x,y) = function
+  | Up, i   -> x, y-i
+  | Down,i  -> x, y+i
+  | Right,i -> x+i, y
+  | Left,i  -> x-i, y
+
+let dest_of_move = function
+  | Remove (x,y)   -> x,y
+  | Move (pos,dir) -> apply_dir pos dir
+
 (* generic fold over the grid. Takes a function given acc ((i,j),x) *)
 let fold f acc b =
   snd @: 
@@ -134,12 +141,6 @@ let eq_square b sq pos = let value = lookup b pos in
 
 (* filter only the positions that match the square *)
 let filter_sq b sq l = List.filter (eq_square b sq) l
-
-let apply_dir (x,y) = function
-  | Up, i   -> x, y-i
-  | Down,i  -> x, y+i
-  | Right,i -> x+i, y
-  | Left,i  -> x-i, y
 
 let rev_dir = function Up -> Down | Down -> Up | Left -> Right | Right -> Left
 
