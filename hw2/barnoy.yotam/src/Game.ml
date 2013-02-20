@@ -1,13 +1,10 @@
 open Util
 open Board
 open GameState
+open AI
 
 let debug = ref false
 let set_debug debug_flag = debug := debug_flag; ()
-
-let string_of_color = function BlackP -> "Black" | WhiteP -> "White"
-let color_of_turn t = match t mod 2 with 0 -> WhiteP | _ -> BlackP
-let other_color = function WhiteP -> BlackP | BlackP -> WhiteP
 
 let rec loop_input_pos prompt =
   print_string prompt;
@@ -27,25 +24,30 @@ let rec loop_input_int prompt f =
 let rec main_loop olds =
   let new_turn = olds.turn + 1 in
   let s = {olds with turn = new_turn} in
+  let board_str = string_of_board_and_coords !(s.board) in
   match expand !(s.board) s.turn with
-   | [] -> let c = other_color @: color_of_turn olds.turn in
-           print_endline @: (string_of_color c)^" Wins!!!\n";
+   | [] -> let color = string_of_color @: color_of_turn olds.turn in
+           print_endline @: "\n"^board_str;
+           print_endline @: "\n---- "^color^" Wins!!!\n";
            start_game ()
-   | moves -> if !debug then List.iter (print_endline |- string_of_move) moves;
-              let f = List.nth s.players @: new_turn mod 2 in
-              let s' = f s moves in
-              main_loop s'
+   | moves -> 
+       if !debug then List.iter (print_endline |- string_of_move) moves;
+       let color_str = string_of_color @: color_of_turn s.turn in
+       let (player, player_fn) = current_player s in
+       let turn_str = "Turn:"^string_of_int s.turn^" "^color_str^" Player"^
+         "("^string_of_player player^")" in
+       print_endline @: "\n"^turn_str;
+       print_endline board_str;
+       let move, s' = player_fn s moves in
+       play !(s'.board) s'.turn move;
+       print_endline @: color_str^" "^string_of_move move;
+       main_loop s'
 
 and player_turn s moves =
-  let board_str = string_of_board_and_coords !(s.board) in
   let rec loop_player () = 
     let invalid_move () = print_endline "Invalid move\n"; loop_player () in
-    let color_str = string_of_color @: color_of_turn s.turn in
-    print_endline @: "Turn:"^string_of_int s.turn^" "^color_str^" Player";
-    print_endline board_str;
     let play_move m =
-      if List.exists ((=) m) moves then (play !(s.board) s.turn m; s)
-      else invalid_move ()
+      if List.exists ((=) m) moves then m,s else invalid_move ()
     in match s.turn with
      | 1 | 2 ->
        let x,y = loop_input_pos "Choose a piece to remove: " in
@@ -89,20 +91,21 @@ and start_game () =
     print_string 
       "Would you like to play black(1), white(2), both(3), or neither(4)?";
     try 
+      let human = Human, player_turn in
       begin match read_int () with
-        | 1 -> [None; Some player_turn]
-        | 2 -> [Some player_turn; None] 
-        | 3 -> [Some player_turn; Some player_turn]
+        | 1 -> [None; Some human]
+        | 2 -> [Some human; None] 
+        | 3 -> [Some human; Some human]
         | 4 -> [None; None]
         | _ -> player_loop ()
       end 
     with Failure _ -> player_loop () in
-  let players : playerf_t option list = player_loop () in
+  let players = player_loop () in
   let rec ai_loop c_str =
     print_endline @: AI.string_of_ai_list ();
     print_string @: "Please choose an AI for the "^c_str^" player:";
     try let choice = read_int () in
-      snd @: List.assoc choice AI.ai_list
+      List.assoc choice AI.ai_list
     with Failure _ -> ai_loop c_str in
   let players' = 
     List.map2 (fun p c_str -> match p with Some x -> x | None -> ai_loop c_str) 

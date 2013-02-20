@@ -43,9 +43,9 @@ let string_of_pos (x,y) = "("^string_of_int x^", "^string_of_int y^")"
 let abc_of_pos (x,y) = List.nth abc x^string_of_int (y + 1)
 
 let string_of_move = function
-  | Remove (a,b) -> "Remove "^string_of_pos (a,b)
-  | Move ((x,y),(dir,i)) -> "Move "^
-    string_of_pos (x,y)^" "^string_of_int i^" "^string_of_dir dir
+  | Remove (a,b) -> "removes "^abc_of_pos (a,b)
+  | Move ((x,y),(dir,i)) -> "moves "^
+    abc_of_pos (x,y)^" "^string_of_dir dir^" "^string_of_int i
 
 let string_of_board b = 
   let string_of_line l = 
