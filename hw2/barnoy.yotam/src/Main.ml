@@ -14,6 +14,7 @@ let parse_cmd_line () = Arg.parse param_specs (fun str -> ()) ""
 let main () = 
   parse_cmd_line ();
   set_debug !debug;
+  Random.self_init ();
   start_game ()
 
 let _ = main ()
