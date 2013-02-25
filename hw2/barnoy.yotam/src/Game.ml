@@ -110,10 +110,13 @@ and start_game () =
     print_endline @: AI.string_of_ai_list ();
     print_string @: "Please choose an AI for the "^c_str^" player:";
     try let choice = read_int () in
-      List.assoc choice AI.ai_list
+        let ai = List.assoc choice AI.ai_list in
+        let ai_fn = get_ai_fn ai in
+        (ai, ai_fn)
     with Failure _ -> ai_loop c_str in
   let players' = 
-    List.map2 (fun p c_str -> match p with Some x -> x | None -> ai_loop c_str) 
+    List.map2 
+      (fun p c_str -> match p with | Some x -> x | None -> ai_loop c_str) 
       players ["white"; "black"] in
   main_loop {board=ref board; turn=0; players=players'}
 
