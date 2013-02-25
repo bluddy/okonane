@@ -62,13 +62,13 @@ let string_of_board_and_coords b =
   in
   (* convert grid to list-of-arrays form *)
   let grid_list = array_map id_fn b.grid in 
-  let num_grid = insert_index_fst 1 grid_list in
+  let num_grid = insert_idx_fst 1 grid_list in
   top_coord_line^"\n"^
     String.concat "\n" @: list_map string_of_line num_grid
 
 (* convert a position in "a1" form to a tuple *)
 let pos_of_str str =
-  let abc_i = insert_index_snd 0 abc in
+  let abc_i = insert_idx_snd 0 abc in
   let len = String.length str in
   if len <> 2 then None
   else 

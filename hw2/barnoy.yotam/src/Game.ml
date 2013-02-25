@@ -102,7 +102,7 @@ and player_turn state moves =
        match possib_moves with
        | [] -> invalid_move ()
        | _  -> let dests = List.map dest_of_move possib_moves in
-               let num_dests = insert_index_fst 1 dests in
+               let num_dests = insert_idx_fst 1 dests in
                let strs = List.map 
                  (fun (i,p) -> string_of_int i^" "^abc_of_pos p) num_dests in
                let str = String.concat "\n" strs in

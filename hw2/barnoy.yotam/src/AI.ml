@@ -7,7 +7,7 @@ type player_t = Human
            | MinimaxAI
            | AlphaBetaAI
 
-let ai_list = [1, RandomAI; 2, MinimaxAI; 3, AlphaBetaAI]
+let ai_list = insert_idx_fst 1 [RandomAI; MinimaxAI; AlphaBetaAI]
 
 let is_human = function Human -> true | _ -> false
 
@@ -24,6 +24,23 @@ let evaluate_by_moves s max =
     let moves = List.length @: expand !(s.board) s.turn in
     let moves' = List.length @: expand !(s.board) @: s.turn+1 in
     let e = moves - moves' in
+    if max then e else -e
+
+(* more accurate evaluation: compares to avg of next turn's # moves *)
+let evaluate_by_moves_detailed s max =
+  if s.turn <= 2 then 0 (* can't evaluate such an early turn *)
+  else
+    let b = s.board and turn = s.turn in
+    let moves = expand !b turn in
+    let total = List.fold_left 
+      (fun tot m -> play !b turn m; 
+        let num_moves = List.length @: expand !b (turn + 1) in
+        rewind !b turn m;
+        tot + num_moves)
+      0 moves in
+    let num_m = List.length moves in
+    let num_m' = if num_m = 0 then 100 else total / num_m in
+    let e = num_m - num_m' in
     if max then e else -e
 
 (* Simple random choice algorithm *)
@@ -124,13 +141,15 @@ let rec get_depth () =
   try read_int ()
   with Failure _ -> get_depth ()
 
-let get_ai_fn = function
+let get_ai_fn ai = 
+  let eval_f = evaluate_by_moves_detailed in
+  match ai with
   | MinimaxAI -> 
       let d = get_depth () in
-      ai_minimax evaluate_by_moves d
+      ai_minimax eval_f d
   | AlphaBetaAI -> 
       let d = get_depth () in
-      ai_alpha_beta evaluate_by_moves d
+      ai_alpha_beta eval_f d
   | RandomAI -> ai_random_fn
   | _ -> failwith "unhandled AI"
   
