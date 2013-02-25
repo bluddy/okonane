@@ -12,6 +12,8 @@ let id_fn a = a
 
 let (|-) = compose
 
+type ('a,'b) either_t = Left of 'a | Right of 'b
+
 (* take the first x elements of a list *)
 let list_take len li =
   let rec take len2 li2 acc_list =

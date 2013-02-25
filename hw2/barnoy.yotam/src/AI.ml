@@ -21,27 +21,31 @@ let ai_random_fn s moves =
 let ai_minimax s _ =
   let b = s.board in
   let rec loop max turn move =
-    maybe () (fun m -> play !b turn m) move;
+    maybe () (fun m -> play !b (turn-1) m) move;
     let moves = expand !b turn in
     match moves with
-     | [] -> maybe () (fun m -> rewind !b turn m) move; 
-             if max then (-1,move) else (1,move) (* Utility of winning/losing *)
+     | [] -> maybe () (fun m -> rewind !b (turn-1) m) move; 
+             if max then Right (-1) else Right 1 (* Utility of winning/losing *)
      | _  -> 
          let options = list_map 
-              (fun m -> loop (not max) (turn+1) @: Some m) moves in 
+              (fun m -> loop (not max) (turn+1) @: Some m, m) moves in 
          (* find the best option *)
          let op = match max with true -> (>) | false -> (<) in
-         let minmax = List.fold_left 
-                        (fun ((y,_) as best) ((x,_) as m) ->
-                          if op x y then m else best) 
-                        (List.hd options) 
-                        (List.tl options) in
-         maybe () (fun m -> rewind !b turn m) move;
-         minmax
+         let get_minmax a b = match a,b with
+            (((Right y),_) as best), (((Right x),_) as m) -> 
+              if op x y then m else best
+            | _,_ -> failwith "Error in minimax" in
+         let minmax = 
+           List.fold_left get_minmax (List.hd options) (List.tl options) in
+         match move, minmax with
+         | None, (Right i, m) -> Left (m, i) (* return the move we chose *)
+         | Some m, _          -> rewind !b (turn-1) m; fst minmax
+         | _, _               -> failwith "Error2 in minimax"
   in
   match loop true s.turn None with
-   | _, None -> failwith "error, no move found by minimax"
-   | _, Some x -> x, s
+   | Right _     -> failwith "error, no move found by minimax"
+   | Left (m, i) -> print_endline @: "move has value "^string_of_int i;
+                  m, s
 
 let ai_list = [
                1, (RandomAI, ai_random_fn);

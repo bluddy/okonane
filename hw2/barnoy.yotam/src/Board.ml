@@ -4,7 +4,7 @@ open Util
 
 type square_t = Empty | White | Black
 
-type dir_t = Up | Down | Right | Left
+type dir_t = DirUp | DirDown | DirRight | DirLeft
 
 type move_t = Remove of int * int
             | Move of (int * int) * (dir_t * int) 
@@ -36,7 +36,7 @@ let string_of_square = function
   | Empty -> " "
 
 let string_of_dir = function
-  | Up -> "up" | Down -> "down" | Left -> "left" | Right -> "right"
+  | DirUp -> "up" | DirDown -> "down" | DirLeft -> "left" | DirRight -> "right"
 
 let string_of_pos (x,y) = "("^string_of_int x^", "^string_of_int y^")"
 
@@ -88,17 +88,17 @@ let pos_of_str str =
 let move_of_2_pos ((x1,y1) as pos) (x2,y2) =
   match x2-x1, y2-y1 with
    | 0, y when y mod 2 <> 0 -> None (* must be even *)
-   | 0, y when y > 0        -> Some(Move(pos, (Down, y)))
-   | 0, y when y < 0        -> Some(Move(pos, (Up, -y)))
-   | x, 0 when x > 0        -> Some(Move(pos, (Right, x)))
-   | x, 0 when x < 0        -> Some(Move(pos, (Left, -x)))
+   | 0, y when y > 0        -> Some(Move(pos, (DirDown, y)))
+   | 0, y when y < 0        -> Some(Move(pos, (DirUp, -y)))
+   | x, 0 when x > 0        -> Some(Move(pos, (DirRight, x)))
+   | x, 0 when x < 0        -> Some(Move(pos, (DirLeft, -x)))
    | _ -> None
 
 let apply_dir (x,y) = function
-  | Up, i   -> x, y-i
-  | Down,i  -> x, y+i
-  | Right,i -> x+i, y
-  | Left,i  -> x-i, y
+  | DirUp, i   -> x, y-i
+  | DirDown,i  -> x, y+i
+  | DirRight,i -> x+i, y
+  | DirLeft,i  -> x-i, y
 
 let dest_of_move = function
   | Remove (x,y)   -> x,y
@@ -142,7 +142,8 @@ let eq_square b sq pos = let value = lookup b pos in
 (* filter only the positions that match the square *)
 let filter_sq b sq l = List.filter (eq_square b sq) l
 
-let rev_dir = function Up -> Down | Down -> Up | Left -> Right | Right -> Left
+let rev_dir = function DirUp -> DirDown | DirDown -> DirUp 
+              | DirLeft -> DirRight | DirRight -> DirLeft
 
 let color_of_turn t = match t mod 2 with 0 -> White | _ -> Black
 
@@ -165,7 +166,7 @@ let expand b turn =
     List.map (fun (a,b) -> Remove (a,b)) whites
 
   | t ->
-      let dirs = [Up,0; Down,0; Left,0; Right,0] in
+      let dirs = [DirUp,0; DirDown,0; DirLeft,0; DirRight,0] in
       let pieces = get_squares b color in
       let adjs = List.flatten @:
         list_map (fun x -> list_zip [x;x;x;x] dirs) pieces in
@@ -233,7 +234,10 @@ let play_rewind rewind b turn move =
                begin match rewind, lookup b pos1, lookup b pos2 with
                 | false, c, Empty when c = otherc -> set_pos Empty 
                 | true, Empty, Empty -> set_pos otherc
-                | _ -> failwith "Bad board configuration" end 
+                | _ -> failwith @: "Bad board configuration:\n"^
+                      string_of_board_and_coords b^" rewind: "^
+                      string_of_bool rewind^" pos1:"^string_of_pos pos1^
+                      " pos2:"^string_of_pos pos2  end 
              in List.iter modify r
         end in 
       (* if we're rewinding, turn the move around *)

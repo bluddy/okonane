@@ -39,6 +39,11 @@ let rec main_loop olds =
        print_endline @: "\n"^turn_str;
        print_endline board_str;
        let move, s' = player_fn s moves in
+       (*Debug -- double check that we got a legit move back *)
+       if not @: List.exists ((=)move) moves then 
+         (print_endline @: "Bad move: "^string_of_move move;
+          let board_str = string_of_board_and_coords !(s.board) in
+          print_endline board_str);
        play !(s'.board) s'.turn move;
        print_endline @: color_str^" "^string_of_move move;
        main_loop s'
