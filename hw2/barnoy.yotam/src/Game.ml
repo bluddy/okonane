@@ -6,13 +6,6 @@ open AI
 let debug = ref false
 let set_debug debug_flag = debug := debug_flag; ()
 
-let rec loop_input_pos prompt =
-  print_string prompt;
-  let line = read_line () in
-  match pos_of_str line with
-   | None -> print_endline "Bad input\n"; loop_input_pos prompt
-   | Some pos -> pos
-
 let rec loop_input_int prompt f =
   let fail () = print_endline "Bad input\n"; loop_input_int prompt f in
   print_string prompt;
@@ -39,45 +32,71 @@ let modify_ai s =
     players ["white"; "black"] in
   {s with players = players'}
 
+(* parse options we may want to change during runtime *)
+let parse_options s = function
+  | "z" -> Some (modify_ai s)
+  | _   -> None
+
+let print_board s =
+  let board_str = string_of_board_and_coords !(s.board) in
+   print_endline board_str; ()
+
+let print_turn_and_board s =
+   let color_str = string_of_color @: color_of_turn s.turn in
+   let (player, _) = current_player s in
+   let turn_str = "Turn:"^string_of_int s.turn^" "^color_str^" Player"^
+     "("^string_of_player player^")" in
+   print_endline turn_str; print_board s; ()
+
 let rec main_loop olds =
   let new_turn = olds.turn + 1 in
   let s = {olds with turn = new_turn} in
-  let board_str = string_of_board_and_coords !(s.board) in
   match expand !(s.board) s.turn with
    | [] -> let color = string_of_color @: color_of_turn olds.turn in
-           print_endline @: "\n"^board_str;
+           print_newline ();
+           print_board s;
            print_endline @: "\n---- "^color^" Wins!!!\n";
            start_game ()
    | moves -> 
        if !debug then List.iter (print_endline |- string_of_move) moves;
        let color_str = string_of_color @: color_of_turn s.turn in
        let (player, player_fn) = current_player s in
-       let turn_str = "Turn:"^string_of_int s.turn^" "^color_str^" Player"^
-         "("^string_of_player player^")" in
-       print_endline @: "\n"^turn_str;
-       print_endline board_str;
-       let move, s' = player_fn s moves in
-       (*Debug -- double check that we got a legit move back *)
+       print_turn_and_board s;
+       (* get ai/player's moves *)
+       let move, new_s = player_fn s moves in
+       (* double check that we got a legit move back *)
        if not @: List.exists ((=)move) moves then 
-         (print_endline @: "Bad move: "^string_of_move move;
-          let board_str = string_of_board_and_coords !(s.board) in
-          print_endline board_str);
-       play !(s'.board) s'.turn move;
+         (print_endline @: "Illegal move: "^
+         string_of_move move; print_board new_s);
+       play !(new_s.board) new_s.turn move;
        print_endline @: color_str^" "^string_of_move move;
-       main_loop s'
+       print_newline ();
+       main_loop new_s 
 
-and player_turn s moves =
+and player_turn state moves =
+  let turn = state.turn in
+  let sref = ref state in
+  let rec loop_input prompt =
+    print_string @: "Choose a piece to "^prompt^" (z configures AI): ";
+    let line = read_line () in
+    match pos_of_str line with
+     | None -> begin match parse_options !sref line with
+                | None -> print_endline "Bad input\n"; loop_input prompt
+                | Some s -> sref := s; 
+                  print_turn_and_board s; loop_input prompt 
+               end
+     | Some pos -> pos in
   let rec loop_player () = 
     let invalid_move () = print_endline "Invalid move\n"; loop_player () in
     let play_move m =
-      if List.exists ((=) m) moves then m,s else invalid_move ()
-    in match s.turn with
+      if List.exists ((=) m) moves then m,!sref else invalid_move ()
+    in match turn with
      | 1 | 2 ->
-       let x,y = loop_input_pos "Choose a piece to remove: " in
+       let x,y = loop_input "remove" in
        let m = Remove(x,y) in
        play_move m
      | _ ->
-       let pos1 = loop_input_pos "Choose a piece to move: " in
+       let pos1 = loop_input "move" in
        let possib_moves = 
          List.filter (function Move (p,_) -> pos1 = p | _ -> false) moves in
        match possib_moves with
