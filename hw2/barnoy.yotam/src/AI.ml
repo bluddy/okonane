@@ -71,7 +71,7 @@ let ai_minimax eval_f max_depth s _ =
       "Considered "^string_of_int num^" moves. Move has value "^string_of_int i;
       m, s
 
-(* Alpha-beta pruning *)
+(* Alpha-beta pruning algorithm *)
 let ai_alpha_beta eval_f max_depth s _ =
   let brd = s.board in
   let scanned = ref 0 in
@@ -104,7 +104,7 @@ let ai_alpha_beta eval_f max_depth s _ =
          else 
            foldl_until
               (fun (b,n) m -> 
-                match loop false (turn+1) (depth+1) (alpha,b) (Some m) with
+                match loop true (turn+1) (depth+1) (alpha,b) (Some m) with
                 | Right x -> if x < b then x,m else b,n
                 | _ -> failwith "error")
               (fun (b,_) _ -> b <= alpha)
