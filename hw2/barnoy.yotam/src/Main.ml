@@ -17,7 +17,7 @@ let main () =
   parse_cmd_line ();
   Game.set_debug !debug;
   Random.self_init ();
-  start_game ()
+  start_game !silent
 
 let _ = main ()
 

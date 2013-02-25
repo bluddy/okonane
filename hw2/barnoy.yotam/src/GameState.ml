@@ -3,7 +3,9 @@ open Board
 
 type player_t = BlackP | WhiteP
 
-type 'a playerf_t = 'a gamestate_t -> move_t list -> move_t * 'a gamestate_t
+type 'a playerf_t = 
+  'a gamestate_t -> move_t list -> move_t * 'a gamestate_t * int
+
 and 'a gamestate_t = {
                      board: board_t ref;
                      turn: int;

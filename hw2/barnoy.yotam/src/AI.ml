@@ -46,7 +46,7 @@ let evaluate_by_moves_detailed s max =
 (* Simple random choice algorithm *)
 let ai_random_fn s moves =
   let choice = Random.int @: List.length moves in
-  List.nth moves choice, s
+  List.nth moves choice, s, 1
 
 (* minimax algorithm *)
 let ai_minimax eval_f max_depth s _ =
@@ -86,7 +86,7 @@ let ai_minimax eval_f max_depth s _ =
    | Right _ -> failwith "minimax error"
    | Left (m, i, num) -> print_endline @: 
       "Considered "^string_of_int num^" moves. Move has value "^string_of_int i;
-      m, s
+      m, s, !scanned
 
 (* Alpha-beta pruning algorithm *)
 let ai_alpha_beta eval_f max_depth s _ =
@@ -133,7 +133,7 @@ let ai_alpha_beta eval_f max_depth s _ =
   match loop true s.turn 0 (-200,200) None with
    | Left (m, i, num) -> print_endline @: 
      "Considered "^string_of_int num^" moves. Move has value "^string_of_int i;
-                  m, s
+                  m, s, !scanned
    | _ -> failwith "alphabeta error"
 
 let rec get_depth () = 

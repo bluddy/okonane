@@ -14,6 +14,13 @@ let rec loop_input_int prompt f =
     if f i then i else fail ()
   with Failure _ -> fail ()
 
+let print_stats s (w_nodes, b_nodes, w_wins, b_wins) = 
+  print_endline @: "White wins: "^string_of_int w_wins;
+  print_endline @: "Black wins: "^string_of_int b_wins;
+  print_endline @: "White nodes checked: "^string_of_int w_nodes;
+  print_endline @: "Black nodes checked: "^string_of_int b_nodes; 
+  ()
+
 let modify_ai s =
   let players = s.players in
   let rec ai_loop c_str =
@@ -48,22 +55,25 @@ let print_turn_and_board s =
      "("^string_of_player player^")" in
    print_endline turn_str; print_board s; ()
 
-let rec main_loop olds =
+let main_loop silent state =
+  let rec loop olds (w_nodes, b_nodes) =
   let new_turn = olds.turn + 1 in
   let s = {olds with turn = new_turn} in
   match expand !(s.board) s.turn with
-   | [] -> let color = string_of_color @: color_of_turn olds.turn in
+   | [] -> let color = color_of_turn olds.turn in
+           let color_s = string_of_color color in
            print_newline ();
            print_board s;
-           print_endline @: "\n---- "^color^" Wins!!!\n";
-           start_game ()
+           print_endline @: "\n---- "^color_s^" Wins!!!\n";
+           (w_nodes, b_nodes, color)
    | moves -> 
        if !debug then List.iter (print_endline |- string_of_move) moves;
-       let color_str = string_of_color @: color_of_turn s.turn in
+       let color = color_of_turn s.turn in
+       let color_str = string_of_color color in
        let (player, player_fn) = current_player s in
-       print_turn_and_board s;
+       if not silent then print_turn_and_board s;
        (* get ai/player's moves *)
-       let move, new_s = player_fn s moves in
+       let move, new_s, num_nodes = player_fn s moves in
        (* double check that we got a legit move back *)
        if not @: List.exists ((=)move) moves then 
          (print_endline @: "Illegal move: "^
@@ -71,9 +81,12 @@ let rec main_loop olds =
        play !(new_s.board) new_s.turn move;
        print_endline @: color_str^" "^string_of_move move;
        print_newline ();
-       main_loop new_s 
+       match color with
+        | BlackP -> loop new_s (w_nodes, b_nodes + num_nodes)
+        | WhiteP -> loop new_s (w_nodes + num_nodes, b_nodes)
+  in loop state (0,0)
 
-and player_turn state moves =
+let rec player_turn state moves =
   let turn = state.turn in
   let sref = ref state in
   let rec loop_input prompt =
@@ -89,7 +102,7 @@ and player_turn state moves =
   let rec loop_player () = 
     let invalid_move () = print_endline "Invalid move\n"; loop_player () in
     let play_move m =
-      if List.exists ((=) m) moves then m,!sref else invalid_move ()
+      if List.exists ((=) m) moves then m,!sref,1 else invalid_move ()
     in match turn with
      | 1 | 2 ->
        let x,y = loop_input "remove" in
@@ -117,7 +130,7 @@ and player_turn state moves =
                end
   in loop_player ()
 
-and start_game () =
+let rec start_game silent =
   print_endline "Welcome to Konane!\n";
   let rec board_loop () : board_t =
     print_string "How big of a board would you like? (4/6/8)";
@@ -145,5 +158,16 @@ and start_game () =
     with Failure _ -> player_loop () in
   let players = player_loop () in
   let s = {board=ref board; turn=0; players=players} in
-  main_loop (modify_ai s)
+  let s' = modify_ai s in
+  let num_games = if silent 
+    then loop_input_int "How many games would you like? " (fun i -> i > 0)
+    else 1 in
+  let stats = List.fold_left (fun (w_nodes, b_nodes, w_wins, b_wins) _ -> 
+    let a,b,color = main_loop silent s' in
+    let w_wins', b_wins' = match color with 
+      | BlackP -> w_wins, b_wins + 1
+      | WhiteP -> w_wins + 1, b_wins in
+     w_nodes + a, b_nodes + b, w_wins', b_wins')
+    (0,0,0,0) @: create_range 0 num_games in 
+    print_stats stats; ()
 
