@@ -21,6 +21,24 @@ let rec loop_input_int prompt f =
     if f i then i else fail ()
   with Failure _ -> fail ()
 
+let modify_ai s =
+  let players = s.players in
+  let rec ai_loop c_str =
+    print_endline @: AI.string_of_ai_list ();
+    print_string @: "Please choose an AI for the "^c_str^" player:";
+    try let choice = read_int () in
+        let ai = List.assoc choice AI.ai_list in
+        let ai_fn = get_ai_fn ai in
+        (ai, ai_fn)
+    with Failure _ -> ai_loop c_str in
+  (* Fill in all non-human players *)
+  let players' = List.map2 
+    (fun p c_str -> match p with 
+       | (Human,_) as x -> x 
+       | _              -> ai_loop c_str) 
+    players ["white"; "black"] in
+  {s with players = players'}
+
 let rec main_loop olds =
   let new_turn = olds.turn + 1 in
   let s = {olds with turn = new_turn} in
@@ -97,26 +115,16 @@ and start_game () =
       "Would you like to play black(1), white(2), both(3), or neither(4)?";
     try 
       let human = Human, player_turn in
+      let default = RandomAI, get_ai_fn RandomAI in
       begin match read_int () with
-        | 1 -> [None; Some human]
-        | 2 -> [Some human; None] 
-        | 3 -> [Some human; Some human]
-        | 4 -> [None; None]
+        | 1 -> [default; human]
+        | 2 -> [human; default] 
+        | 3 -> [human; human]
+        | 4 -> [default; default]
         | _ -> player_loop ()
       end 
     with Failure _ -> player_loop () in
   let players = player_loop () in
-  let rec ai_loop c_str =
-    print_endline @: AI.string_of_ai_list ();
-    print_string @: "Please choose an AI for the "^c_str^" player:";
-    try let choice = read_int () in
-        let ai = List.assoc choice AI.ai_list in
-        let ai_fn = get_ai_fn ai in
-        (ai, ai_fn)
-    with Failure _ -> ai_loop c_str in
-  let players' = 
-    List.map2 
-      (fun p c_str -> match p with | Some x -> x | None -> ai_loop c_str) 
-      players ["white"; "black"] in
-  main_loop {board=ref board; turn=0; players=players'}
+  let s = {board=ref board; turn=0; players=players} in
+  main_loop (modify_ai s)
 
