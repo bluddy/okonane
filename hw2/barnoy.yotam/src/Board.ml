@@ -227,15 +227,16 @@ let play_rewind rewind b turn move =
              let modify i = 
                let pos1 = apply_dir pos (dir, i-1) in
                let pos2 = apply_dir pos (dir, i) in
-               let set_pos () = 
-                 set b Empty pos1; 
+               let set_pos c = 
+                 set b c pos1; 
                  if i = num then set b color pos2; () in
                begin match rewind, lookup b pos1, lookup b pos2 with
-                | false, c, Empty when c = otherc -> set_pos ()
-                | true, Empty, Empty -> set_pos ()
+                | false, c, Empty when c = otherc -> set_pos Empty 
+                | true, Empty, Empty -> set_pos otherc
                 | _ -> failwith "Bad board configuration" end 
              in List.iter modify r
         end in 
+      (* if we're rewinding, turn the move around *)
       if rewind then 
         let pos = apply_dir p (d, num)  in
         let dir = rev_dir d in

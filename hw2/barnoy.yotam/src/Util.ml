@@ -65,8 +65,9 @@ let read_file file = String.concat "\n" @: read_file_lines file
 
 (* make a range from first to last. Tail recursive *)
 let create_range ?(step=1) first length =
+    let last = first + ((length-1) * step) in
     let rec range_inner index acc =
-        if index >= first+length then acc
+        if index > last then acc
         else range_inner (index+step) (index::acc)
     in
     List.rev(range_inner first [])
@@ -144,4 +145,9 @@ let array_map f arr =
 
 (* split a string into lines *)
 let string_lines s = Str.split (Str.regexp "\n") s
+
+(* maybe function. def is for None, f is given the value on Some *)
+let maybe def f = function
+  | None -> def
+  | Some x -> f x
 
