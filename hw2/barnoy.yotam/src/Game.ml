@@ -14,15 +14,14 @@ let rec loop_input_int prompt f =
     if f i then i else fail ()
   with Failure _ -> fail ()
 
-let print_stats s (w_nodes, b_nodes, w_wins, b_wins) = 
+let print_stats (w_nodes, b_nodes, w_wins, b_wins) = 
   print_endline @: "White wins: "^string_of_int w_wins;
   print_endline @: "Black wins: "^string_of_int b_wins;
   print_endline @: "White nodes checked: "^string_of_int w_nodes;
   print_endline @: "Black nodes checked: "^string_of_int b_nodes; 
   ()
 
-let modify_ai s =
-  let players = s.players in
+let modify_ai players =
   let rec ai_loop c_str =
     print_endline @: AI.string_of_ai_list ();
     print_string @: "Please choose an AI for the "^c_str^" player:";
@@ -32,16 +31,15 @@ let modify_ai s =
         (ai, ai_fn)
     with Failure _ -> ai_loop c_str in
   (* Fill in all non-human players *)
-  let players' = List.map2 
+  List.map2 
     (fun p c_str -> match p with 
        | (Human,_) as x -> x 
        | _              -> ai_loop c_str) 
-    players ["white"; "black"] in
-  {s with players = players'}
+    players ["white"; "black"]
 
 (* parse options we may want to change during runtime *)
 let parse_options s = function
-  | "z" -> Some (modify_ai s)
+  | "z" -> Some {s with players=modify_ai s.players}
   | _   -> None
 
 let print_board s =
@@ -132,38 +130,30 @@ let rec player_turn state moves =
 
 let rec start_game silent =
   print_endline "Welcome to Konane!\n";
-  let rec board_loop () : board_t =
-    print_string "How big of a board would you like? (4/6/8)";
-    try
-      let size = read_int () in
-      begin match Board.make_default size with
-      | None   -> print_endline "Bad size"; board_loop ()
-      | Some b -> b 
-      end 
-    with Failure _ -> board_loop () in
-  let board = board_loop () in
-  let rec player_loop () =
-    print_string 
-      "Would you like to play black(1), white(2), both(3), or neither(4)?";
-    try 
-      let human = Human, player_turn in
-      let default = RandomAI, get_ai_fn RandomAI in
-      begin match read_int () with
-        | 1 -> [default; human]
-        | 2 -> [human; default] 
-        | 3 -> [human; human]
-        | 4 -> [default; default]
-        | _ -> player_loop ()
-      end 
-    with Failure _ -> player_loop () in
-  let players = player_loop () in
-  let s = {board=ref board; turn=0; players=players} in
-  let s' = modify_ai s in
+  let board_size = loop_input_int "How big of a board would you like? (4/6/8)"
+    (function 4 | 6 | 8 -> true | _ -> false) in
+  let player_input = loop_input_int 
+    "Would you like to play black(1), white(2), both(3), or neither(4)?"
+    (function 1 | 2 | 3 | 4 -> true | _ -> false) in
+  let human = Human, player_turn in
+  let default = RandomAI, get_ai_fn RandomAI in
+  let players' = match player_input with
+      | 1 -> [default; human]
+      | 2 -> [human; default] 
+      | 3 -> [human; human]
+      | 4 -> [default; default]
+      | _ -> failwith "start_game error" in
+  (*let s = {board=ref board; turn=0; players=players} in*)
+  let players = modify_ai players' in
   let num_games = if silent 
     then loop_input_int "How many games would you like? " (fun i -> i > 0)
     else 1 in
+
+  (* actually execute the game(s) *)
   let stats = List.fold_left (fun (w_nodes, b_nodes, w_wins, b_wins) _ -> 
-    let a,b,color = main_loop silent s' in
+    let board = Board.make_default board_size in
+    let state = {board=ref board; turn=0; players=players} in
+    let a,b,color = main_loop silent state in
     let w_wins', b_wins' = match color with 
       | BlackP -> w_wins, b_wins + 1
       | WhiteP -> w_wins + 1, b_wins in

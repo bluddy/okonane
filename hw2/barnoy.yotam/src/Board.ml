@@ -13,18 +13,15 @@ type board_t = { size:int;
                 grid:square_t array array; }
 
 let make_default size = 
-  let check_size = function 4 | 6 | 8 -> true | _ -> false in
-  if not @: check_size size then None
-  else 
-    let r = create_range 1 (size*size/4) in
-    let half_list a b = 
-      let bwlist = List.flatten @: list_map (fun _ -> [a; b]) r in
-      list_bunch size bwlist in
-    let board_list = 
-      list_intersperse (half_list Black White) (half_list White Black) in
-    let larray = List.map (fun l -> Array.of_list l) board_list in
-    let garray = Array.of_list larray in
-    Some {size=size; grid=garray}
+  let r = create_range 1 (size*size/4) in
+  let half_list a b = 
+    let bwlist = List.flatten @: list_map (fun _ -> [a; b]) r in
+    list_bunch size bwlist in
+  let board_list = 
+    list_intersperse (half_list Black White) (half_list White Black) in
+  let larray = List.map (fun l -> Array.of_list l) board_list in
+  let garray = Array.of_list larray in
+  {size=size; grid=garray}
 
 (* ----- String representation ----- *)
 
