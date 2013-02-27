@@ -2,11 +2,9 @@ open Util
 open Board
 open GameState
 
+(* The possible types of players *)
 type player_t = Human | RandomAI | MinimaxAI | AlphaBetaAI | TimedMinimaxAI
            | TimedAlphaBetaAI
-
-let ai_list = insert_idx_fst 1 
-  [RandomAI; MinimaxAI; AlphaBetaAI; TimedMinimaxAI; TimedAlphaBetaAI]
 
 let is_human = function Human -> true | _ -> false
 
@@ -17,6 +15,9 @@ let string_of_player = function
   | AlphaBetaAI -> "Alpha-beta AI"
   | TimedMinimaxAI -> "Time-limited Minimax AI"
   | TimedAlphaBetaAI -> "Time-limited Alpha-beta AI"
+
+let ai_list = insert_idx_fst 1 
+  [RandomAI; MinimaxAI; AlphaBetaAI; TimedMinimaxAI; TimedAlphaBetaAI]
 
 (* evaluate the board by the number of possible actions each player has *)
 let evaluate_by_moves s max =
@@ -44,13 +45,46 @@ let evaluate_by_moves_detailed s max =
     let e = num_m - num_m' in
     if max then e else -e
 
+(* Default move ordering function for a-b-pruning *)
+let order_random _ _ _ l =
+  let l' = match Random.int 2 with 0 -> l | _ -> List.rev l in
+  let f, b = List.fold_left 
+    (fun (front,back) x -> match Random.int 2 with 
+      | 0 -> x::front, back | _ -> front, x::back)
+    ([],[]) l'
+  in f @ List.rev b
+
+(* A more sophisticated move-ordering scheme *)
+(* The order of evaluation is:
+  * 1. Moves that give you material advantage (several captures)
+  * 2. Moves that increase your evaluation function
+  * 3. All other moves
+*)
+let order_heuristic eval_f s max (l:move_t list) : (move_t list) =
+  let b = s.board and turn = s.turn in
+  (* For <= turn 2, just use regular order func *)
+  if s.turn <= 2 then order_random eval_f s max l
+  else 
+    let cur_eval = eval_f s max in
+    let cap, eval, other = List.fold_left
+      (fun (cap, eval, other) mov -> match mov with
+       | Move (_,(_,i)) when i > 2 -> (mov :: cap, eval, other)
+       | m -> play !b s.turn m;
+             if (-(eval_f s @: not max)) > cur_eval 
+             then (rewind !b turn m; 
+                  cap, m::eval, other)
+             else (rewind !b turn m; 
+                  cap, eval, m::other))
+      ([],[],[]) l
+    in cap@eval@other
+
 (* Simple random choice algorithm *)
 let ai_random s moves =
   let choice = Random.int @: List.length moves in
   s, MoveChoice (List.nth moves choice, 0, 1, true)
 
 (* minimax algorithm *)
-let ai_minimax eval_f max_depth timeout s _ =
+let ai_minimax eval_f _ max_depth timeout s _ =
   let brd = s.board in
   let scanned = ref 0 in
   let rec loop max turn depth move =
@@ -98,7 +132,9 @@ let ai_minimax eval_f max_depth timeout s _ =
   s, loop true s.turn 0 None 
 
 (* Alpha-beta pruning algorithm *)
-let ai_alpha_beta eval_f max_depth timeout s _ =
+let ai_alpha_beta eval_f m_order_f max_depth timeout s _ =
+  let order_f = match m_order_f with
+    None -> failwith "no order_f" | Some f -> f in
   let brd = s.board in
   let scanned = ref 0 in
 
@@ -111,7 +147,7 @@ let ai_alpha_beta eval_f max_depth timeout s _ =
       let rewind_move () = maybe () (rewind !brd (turn-1)) move in
 
       play_move ();
-      let moves = expand !brd turn in
+      let moves = order_f s max @: expand !brd turn in
       match moves, depth with
        | [], _ -> rewind_move ();
                   if max then MoveValue (-100, true) else MoveValue (100, true)
@@ -152,13 +188,13 @@ let ai_alpha_beta eval_f max_depth timeout s _ =
   in
   s, loop true s.turn 0 (-200,200) None
 
-let ai_time_bounded ai_f time_limit eval_f s moves = 
+let ai_time_bounded ai_f time_limit eval_f m_ord_f s moves = 
   let scanned = ref 0 in
   let start_time = Sys.time () in
   let rec loop depth last_res =
     let time_limit = start_time +. (float_of_int time_limit) in
     let _, res = 
-      ai_f eval_f depth (Some time_limit) s [] in
+      ai_f eval_f m_ord_f depth (Some time_limit) s [] in
     match res with
      | TimeOut -> s, last_res
      | MoveChoice (move, value, num_scanned, true) -> 
@@ -177,21 +213,29 @@ let rec get_depth () =
 let rec get_time () =
   loop_input_int "Enter max time in seconds: " (fun i -> i > 0)
 
+let rec get_ordered () =
+  let choice = 
+    loop_input_int "Random evaluation order (1) or heuristic order (2) ?"
+      (function 1 | 2 -> true | _ -> false)
+  in match choice with 1 -> order_random | _ -> order_heuristic 
+
 let get_ai_fn ai = 
   let eval_f = evaluate_by_moves_detailed in
   match ai with
   | MinimaxAI -> 
       let d = get_depth () in
-      ai_minimax eval_f d None
+      ai_minimax eval_f None d None
   | AlphaBetaAI -> 
       let d = get_depth () in
-      ai_alpha_beta eval_f d None
+      let ord_f = get_ordered () in
+      ai_alpha_beta eval_f (Some (ord_f eval_f)) d None
   | TimedMinimaxAI -> 
       let t = get_time () in
-      ai_time_bounded ai_minimax t eval_f
+      ai_time_bounded ai_minimax t eval_f None
   | TimedAlphaBetaAI -> 
       let t = get_time () in
-      ai_time_bounded ai_alpha_beta t eval_f
+      let ord_f = get_ordered () in
+      ai_time_bounded ai_alpha_beta t eval_f (Some (ord_f eval_f))
   | RandomAI -> ai_random
   | _ -> failwith "unhandled AI"
   
