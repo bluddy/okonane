@@ -7,10 +7,14 @@ let debug = ref false
 let set_debug debug_flag = debug := debug_flag; ()
 
 let print_stats (w_nodes, b_nodes, w_wins, b_wins) = 
-  print_endline @: "White wins: "^string_of_int w_wins;
-  print_endline @: "Black wins: "^string_of_int b_wins;
-  print_endline @: "White nodes checked: "^string_of_int w_nodes;
-  print_endline @: "Black nodes checked: "^string_of_int b_nodes; 
+  let games = w_wins + b_wins in
+  let p_win str x = print_endline @: str^" wins: "^string_of_int x in
+  p_win "White" w_wins; p_win "Black" b_wins;
+  let avg x = (float_of_int x) /. (float_of_int games) in
+  let avg_w = avg w_nodes and avg_b = avg b_nodes in
+  let p_nodes str x y = print_endline @: str^
+    " nodes checked: "^string_of_int x^", avg: "^string_of_float y in
+  p_nodes "White" w_nodes avg_w; p_nodes "Black" b_nodes avg_b;
   ()
 
 (* Fill in all non-human players *)
