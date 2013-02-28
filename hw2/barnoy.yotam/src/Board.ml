@@ -97,9 +97,70 @@ let apply_dir (x,y) = function
   | DirRight,i -> x+i, y
   | DirLeft,i  -> x-i, y
 
+let src_of_move = function
+  | Remove (x,y)   -> x,y
+  | Move (pos,dir) -> pos
+
 let dest_of_move = function
   | Remove (x,y)   -> x,y
   | Move (pos,dir) -> apply_dir pos dir
+
+(*let range_of_move = function*)
+  (*| Move ((x,y) as p, (d,l)) ->*)
+    (*let r = create_range 1 l in*)
+    (*p::list_map (fun i -> apply_dir p (d,i)) r*)
+  (*| _ -> failwith "not a Move"*)
+
+(*[> check if two ranges overlap <]*)
+(*let overlap_range r1 r2 = *)
+  (*List.exists (fun p -> List.exists ((=)p) r2) r1*)
+
+let moves_overlap m n = 
+  let (x1, y1), (x2, y2), (u1, v1), (u2, v2) = 
+    src_of_move m, dest_of_move m, src_of_move n, dest_of_move n in
+  let max_min a b = if a >= b then (a,b) else (b,a) in
+  let mmax_x, mmin_x = max_min x1 x2 in
+  let nmax_x, nmin_x = max_min u1 u2 in
+  let mmax_y, mmin_y = max_min y1 y2 in
+  let nmax_y, nmin_y = max_min v1 v2 in
+  if (mmin_y >= nmin_y && mmax_y <= nmax_y) || 
+     (nmin_y  >= mmin_y && nmax_y <= mmax_y) then
+      if (mmin_x >= nmin_x && mmax_x <= nmax_x) || 
+         (nmin_x >= mmin_x && nmax_x <= mmax_x) then true
+      else false
+  else false
+
+(* find conflicts between a list of moves *)
+let find_conflicts = function
+  | [] | [_] -> []
+  | moves    ->
+    snd @: List.fold_left 
+      (fun (remain, acc) y ->
+        let l = List.fold_left 
+          (fun acc2 x ->
+            if moves_overlap x y then (x, y)::acc2
+            else acc2)
+          acc 
+          remain in
+          match remain with
+           | []    -> ([], l)
+           | x::xs -> (xs, l)
+      )
+      (List.tl moves,[]) 
+      moves
+
+(* get sets of moves that don't conflict *)
+let ortho_move_sets (moves : move_t list) : move_t list list =
+  let conflicts = find_conflicts moves in
+  List.fold_left (fun acc (x,y) ->
+    List.fold_left (fun acc2 l ->
+      if List.exists ((=) x) l && List.exists ((=) y) l then
+        (list_remove x l)::(list_remove y l)::acc2
+      else l::acc2)
+      []
+      acc)
+  [moves]
+  conflicts
 
 (* generic fold over the grid. Takes a function given acc ((i,j),x) *)
 let fold f acc b =
@@ -119,6 +180,9 @@ let get_squares b sq =
     | _                  -> acc
   in
   List.rev @: fold get_sq [] b
+
+let get_num_squares b sq = 
+  fold (fun acc (_,s) -> if s = sq then acc+1 else acc) 0 b
 
 let pos_in_board b (x,y) = match b.size with
   | s when x >= 0 && y >= 0 && x < s && y < s -> true
@@ -250,3 +314,12 @@ let play_rewind rewind b turn move =
 let play = play_rewind false
 (* rewind a move on a board, restoring the board to the way it was *)
 let rewind = play_rewind true
+
+(* utility function to make sure we rewind a test turn *)
+let with_turn b turn move f =
+  play b turn move;
+  let res = f () in
+  rewind b turn move;
+  res
+
+

@@ -19,6 +19,8 @@ let string_of_player = function
 let ai_list = insert_idx_fst 1 
   [RandomAI; MinimaxAI; AlphaBetaAI; TimedMinimaxAI; TimedAlphaBetaAI]
 
+(* ----- evaluation stuf ----- *)
+(*
 (* evaluate the board by the number of possible actions each player has *)
 let evaluate_by_moves s max =
   if s.turn <= 2 then 0 (* can't evaluate such an early turn *)
@@ -44,6 +46,44 @@ let evaluate_by_moves_detailed s max =
     let num_m' = if num_m = 0 then 100 else total / num_m in
     let e = num_m - num_m' in
     if max then e else -e
+*)
+
+let win_score = 10000
+let ortho_move_score = 60
+let material_score = 20
+let move_score = 2
+
+(* calculate the score of a position by the number of orthogonal moves, the
+ * number of pieces, and the total number of available moves *)
+let score_of_pos num_ortho_moves num_pieces num_moves =
+  if num_moves = 0 then (-win_score)
+  else
+    num_ortho_moves * ortho_move_score + 
+    num_pieces * material_score +
+    num_moves * move_score
+
+let eval3 s max =
+  if s.turn <= 2 then 0 (* can't evaluate such an early turn *)
+  else
+    let b = s.board and turn = s.turn in
+    let num_pieces = get_num_squares !b @: Board.color_of_turn turn in
+    let moves = expand !b turn in
+    let num_moves = List.length moves in
+    let ortho_sets = ortho_move_sets moves in
+    snd @: list_max ortho_sets @: fun pos_moves ->
+      let l = List.length moves in
+      let my_score = score_of_pos l num_pieces num_moves in
+      let his_score = snd @: list_max moves @:
+        fun m -> with_turn !b turn m @:
+          fun () -> 
+            let turn' = turn + 1 in
+            let his_pieces = get_num_squares !b @: Board.color_of_turn turn' in
+            let his_moves = expand !b turn' in
+            let num_his_moves = List.length his_moves in
+            let his_ortho_sets = ortho_move_sets his_moves in
+            let most = snd @: list_max his_ortho_sets List.length in
+            score_of_pos most his_pieces num_his_moves in
+      my_score - his_score
 
 (* Default move ordering function for a-b-pruning *)
 let order_random _ _ _ l =
@@ -99,7 +139,8 @@ let ai_minimax eval_f _ max_depth timeout s _ =
       let moves = expand !brd turn in
       match moves, depth with
        | [], _ -> rewind_move ();
-             if max then MoveValue (-100, true) else MoveValue (100, true)
+             if max then MoveValue (-win_score, true) 
+             else MoveValue (win_score, true)
 
        | _, d when d >= max_depth -> 
              let e = eval_f s max in (* forced to use heuristic *)
@@ -109,7 +150,8 @@ let ai_minimax eval_f _ max_depth timeout s _ =
        | _, _ -> 
            (* loop over all possible moves *)
            let op, def_val = match max with 
-             true -> (>), -1000 | false -> (<), 1000 in
+             true -> (>), -win_score | false -> (<), win_score in
+
            let (i, m, last, seen_all_l) = foldl_until
              (fun (best_val, best_move, _, acc) move ->
                match loop (not max) (turn+1) (depth+1) (Some move) with
@@ -150,7 +192,8 @@ let ai_alpha_beta eval_f m_order_f max_depth timeout s _ =
       let moves = order_f s max @: expand !brd turn in
       match moves, depth with
        | [], _ -> rewind_move ();
-                  if max then MoveValue (-100, true) else MoveValue (100, true)
+                  if max then MoveValue (-win_score, true) 
+                  else MoveValue (win_score, true)
        | _, d when d >= max_depth -> 
               let e = eval_f s max in (* forced to use heuristic *)
               rewind_move ();
@@ -162,10 +205,11 @@ let ai_alpha_beta eval_f m_order_f max_depth timeout s _ =
                   match loop false (turn+1) (depth+1) (a,beta) (Some m) with
                   | MoveValue (x,all) as ret -> 
                       if x > a then x,m,ret,all::acc else a,n,ret,all::acc
+
                   | TimeOut              -> a,n,TimeOut,[false]
                   | _ -> failwith "error")
                 (fun (a,_,last,_) _ -> beta <= a || last = TimeOut)
-                (alpha, List.hd moves, MoveValue(-200,true), []) 
+                (alpha, List.hd moves, MoveValue(-win_score,true), []) 
                 moves
            else 
              foldl_until
@@ -176,7 +220,7 @@ let ai_alpha_beta eval_f m_order_f max_depth timeout s _ =
                   | TimeOut              -> b,n,TimeOut,[false]
                   | _ -> failwith "error")
                 (fun (b,_,last,_) _ -> b <= alpha || last = TimeOut)
-                (beta, List.hd moves, MoveValue (200,true), []) 
+                (beta, List.hd moves, MoveValue (win_score,true), []) 
                 moves
          in 
          let seen_all = List.for_all id_fn seen_all_l in
@@ -186,7 +230,7 @@ let ai_alpha_beta eval_f m_order_f max_depth timeout s _ =
           | Some _, _  -> MoveValue (i, seen_all)
           | None,   _  -> MoveChoice (m, i, !scanned, seen_all)
   in
-  s, loop true s.turn 0 (-200,200) None
+  s, loop true s.turn 0 (-win_score,win_score) None
 
 let ai_time_bounded ai_f time_limit eval_f m_ord_f s moves = 
   let scanned = ref 0 in
@@ -197,13 +241,16 @@ let ai_time_bounded ai_f time_limit eval_f m_ord_f s moves =
       ai_f eval_f m_ord_f depth (Some time_limit) s [] in
     match res with
      | TimeOut -> s, last_res
+
      | MoveChoice (move, value, num_scanned, true) -> 
          (* we've explored the whole tree *)
          scanned := !scanned + num_scanned; 
          s, MoveChoice (move, value, !scanned, true)
+
      | MoveChoice (move, value, num_scanned, false) -> 
          scanned := !scanned + num_scanned; 
          loop (depth+1) @: MoveChoice (move, value, !scanned, false)
+
      | _ -> failwith "error in ai_time_bounded"
   in loop 1 @: MoveChoice (List.hd moves, 0, 0, false) (* a crappy default choice *)
 
@@ -220,7 +267,7 @@ let rec get_ordered () =
   in match choice with 1 -> order_random | _ -> order_heuristic 
 
 let get_ai_fn ai = 
-  let eval_f = evaluate_by_moves_detailed in
+  let eval_f = eval3 in
   match ai with
   | MinimaxAI -> 
       let d = get_depth () in

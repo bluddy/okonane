@@ -44,6 +44,14 @@ let list_head l = match l with
 
 let list_last xs = list_head @: list_take_end 1 xs
 
+(* will only remove one instance of x in xs (as opposed to filter) *)
+let list_remove r l = 
+  let rec loop acc = function
+    | x::xs when x = r -> (List.rev acc)@xs
+    | x::xs -> loop (x::acc) xs
+    | []    -> List.rev acc
+  in loop [] l
+
 let compose_fn f g x = f(g x)
 
 (* function that folds until a predicate is true *)
@@ -109,6 +117,19 @@ let list_intersperse la lb =
     | [],    y::ys -> loop (y::acc) [] ys
     | [], []       -> acc
   in List.rev @: loop [] la lb
+
+(* find the maximum element of a list according to a transformation function (to int) *)
+let list_minmax op l f = match l with
+  | [x]   -> (x, f x)
+  | x::xs -> 
+    List.fold_left 
+      (fun acc m -> let n = f m in 
+                    if op n (snd acc) then (m,n) else acc) 
+      (x, f x) xs
+  | _     -> invalid_arg "Empty list"
+
+let list_max l f = list_minmax (>) l f
+let list_min l f = list_minmax (<) l f
     
 (* flatten a list, removing option elements *)
 let flatten_option l = List.filter (function None -> false | Some _ -> true) l
