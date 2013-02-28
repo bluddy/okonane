@@ -181,6 +181,16 @@ let get_squares b sq =
   in
   List.rev @: fold get_sq [] b
 
+let get_squares_empty b sq =
+  let get_sq ((m,accs,n,acce) as x) = function 
+    | (pos, x) when x=sq -> (m+1, pos::accs, n, acce)
+    | (pos, Empty)       -> (m, accs, n+1, pos::acce)
+    | _                  -> x
+  in
+  let a, l1, b, l2 = fold get_sq (0,[],0,[]) b in
+  a, List.rev l1, b, List.rev l2
+
+
 let get_num_squares b sq = 
   fold (fun acc (_,s) -> if s = sq then acc+1 else acc) 0 b
 
@@ -228,9 +238,16 @@ let expand b turn =
 
   | t ->
       let dirs = [DirUp,0; DirDown,0; DirLeft,0; DirRight,0] in
-      let pieces = get_squares b color in
-      let adjs = List.flatten @:
-        list_map (fun x -> list_zip [x;x;x;x] dirs) pieces in
+      let (n_p, pieces, n_e, empty) = get_squares_empty b color in
+      let adjs =  (* if there are fewer empties, use those *)
+        if n_p <= n_e then
+          List.flatten @:
+            list_map (fun x -> list_zip [x;x;x;x] dirs) pieces
+        else 
+          List.filter (fun (x, _) -> pos_in_board b x && eq_square b color x) @:
+            list_map (fun (x, (d,i)) -> apply_dir x (d,2), (rev_dir d, 0)) @:
+              List.flatten @:
+                list_map (fun x -> list_zip [x;x;x;x] dirs) empty in
 
       (* we loop, extending our jumps until we can't extend any *)
       let rec loop acc l = 
