@@ -169,8 +169,8 @@ let is_border_move b move =
   let src = src_of_move move and dst = dest_of_move move in
   let check_border = function
      | (0,_) | (_,0)         -> true
-     | (i,_) when i = b.size -> true
-     | (_,i) when i = b.size -> true
+     | (i,_) when i = last   -> true
+     | (_,i) when i = last   -> true
      | _                     -> false
   in check_border src || check_border dst
 
