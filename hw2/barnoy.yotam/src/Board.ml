@@ -162,6 +162,18 @@ let ortho_move_sets (moves : move_t list) : move_t list list =
   [moves]
   conflicts
 
+(* Does this move take place along the border? It seems that border moves are
+ * more important than non-border moves *)
+let is_border_move b move =
+  let last = b.size - 1 in
+  let src = src_of_move move and dst = dest_of_move move in
+  let check_border = function
+     | (0,_) | (_,0)         -> true
+     | (i,_) when i = b.size -> true
+     | (_,i) when i = b.size -> true
+     | _                     -> false
+  in check_border src || check_border dst
+
 (* generic fold over the grid. Takes a function given acc ((i,j),x) *)
 let fold f acc b =
   snd @: 

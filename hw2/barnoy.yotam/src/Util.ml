@@ -14,6 +14,8 @@ let (|-) = compose
 
 type ('a,'b) either_t = Left of 'a | Right of 'b
 
+let list_null = function [] -> true | _ -> false
+
 (* take the first x elements of a list *)
 let list_take len li =
   let rec take len2 li2 acc_list =

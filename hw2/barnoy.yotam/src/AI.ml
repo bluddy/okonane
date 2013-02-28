@@ -20,22 +20,26 @@ let ai_list = insert_idx_fst 1
   [RandomAI; MinimaxAI; AlphaBetaAI; TimedMinimaxAI; TimedAlphaBetaAI]
 
 (* ----- evaluation stuf ----- *)
-(*
+
+let win_score = 10000
+let ortho_move_score = 60
+let material_score = 20
+let move_score = 2
+
 (* evaluate the board by the number of possible actions each player has *)
-let evaluate_by_moves s max =
-  if s.turn <= 2 then 0 (* can't evaluate such an early turn *)
+let evaluate_by_moves s max moves =
+  if s.turn <= 2 then 0  (* can't evaluate such an early turn *)
   else
-    let moves = List.length @: expand !(s.board) s.turn in
-    let moves' = List.length @: expand !(s.board) @: s.turn+1 in
-    let e = moves - moves' in
+    let mov_num = List.length @: moves in
+    let mov_num' = List.length @: expand !(s.board) @: s.turn+1 in
+    let e = mov_num - mov_num' in
     if max then e else -e
 
 (* more accurate evaluation: compares to avg of next turn's # moves *)
-let evaluate_by_moves_detailed s max =
+let evaluate_by_moves_detailed s max moves =
   if s.turn <= 2 then 0 (* can't evaluate such an early turn *)
   else
     let b = s.board and turn = s.turn in
-    let moves = expand !b turn in
     let total = List.fold_left 
       (fun tot m -> play !b turn m; 
         let num_moves = List.length @: expand !b (turn + 1) in
@@ -43,15 +47,10 @@ let evaluate_by_moves_detailed s max =
         tot + num_moves)
       0 moves in
     let num_m = List.length moves in
-    let num_m' = if num_m = 0 then 100 else total / num_m in
+    let num_m' = if num_m = 0 then win_score else total / num_m in
     let e = num_m - num_m' in
     if max then e else -e
-*)
 
-let win_score = 10000
-let ortho_move_score = 60
-let material_score = 20
-let move_score = 2
 
 (* calculate the score of a position by the number of orthogonal moves, the
  * number of pieces, and the total number of available moves *)
@@ -62,31 +61,58 @@ let score_of_pos num_ortho_moves num_pieces num_moves =
     num_pieces * material_score +
     num_moves * move_score
 
-let eval3 s max =
+let eval3 s max moves =
+  let report i = if max then i else -i in
   if s.turn <= 2 then 0 (* can't evaluate such an early turn *)
   else
     let b = s.board and turn = s.turn in
     let num_pieces = get_num_squares !b @: Board.color_of_turn turn in
-    let moves = expand !b turn in
-    let num_moves = List.length moves in
-    let ortho_sets = ortho_move_sets moves in
-    snd @: list_max ortho_sets @: fun pos_moves ->
-      let l = List.length moves in
-      let my_score = score_of_pos l num_pieces num_moves in
-      let his_score = snd @: list_max moves @:
-        fun m -> with_turn !b turn m @:
-          fun () -> 
-            let turn' = turn + 1 in
-            let his_pieces = get_num_squares !b @: Board.color_of_turn turn' in
-            let his_moves = expand !b turn' in
-            let num_his_moves = List.length his_moves in
-            let his_ortho_sets = ortho_move_sets his_moves in
-            let most = snd @: list_max his_ortho_sets List.length in
-            score_of_pos most his_pieces num_his_moves in
-      my_score - his_score
+    if list_null moves then report (-win_score)
+    else
+      let num_moves = List.length moves in
+      let ortho_sets = ortho_move_sets moves in
+      let max_set_size = snd @: list_max ortho_sets List.length in
+      let my_score = score_of_pos max_set_size num_pieces num_moves in
+      let his_score = snd @: list_min moves @: 
+          fun m -> with_turn !b turn m @:
+            fun () -> 
+              let turn' = turn + 1 in
+              let his_pieces = 
+                get_num_squares !b @: Board.color_of_turn turn' in
+              match expand !b turn' with
+              | [] -> win_score (* we win *)
+              | m ->
+                let num_his_moves = List.length m in
+                let his_ortho_sets = ortho_move_sets m in
+                let max_set_size = snd @: list_max his_ortho_sets List.length in
+                score_of_pos max_set_size his_pieces num_his_moves in
+      report @: my_score - his_score
+
+(* a cheaper version of the eval function *)
+let eval3_cheap s max moves =
+  let report i = if max then i else -i in
+  if s.turn <= 2 then 0 (* can't evaluate such an early turn *)
+  else
+    let b = s.board and turn = s.turn in
+    let num_pieces = get_num_squares !b @: Board.color_of_turn turn in
+    if list_null moves then report (-win_score)
+    else
+      let num_moves = List.length moves in
+      let ortho_sets = ortho_move_sets moves in
+      let max_set_size = snd @: list_max ortho_sets List.length in
+      let my_score = score_of_pos max_set_size num_pieces num_moves in
+      let turn' = turn + 1 in
+      (* pretend that it's his turn for simplicity *)
+      let his_pieces = get_num_squares !b @: Board.color_of_turn turn' in
+      let his_moves = expand !b turn' in
+      let num_his_moves = List.length his_moves in
+      let his_ortho_sets = ortho_move_sets his_moves in
+      let max_set_size = snd @: list_max his_ortho_sets List.length in
+      let his_score = score_of_pos max_set_size his_pieces num_his_moves in
+      report @: my_score - his_score
 
 (* Default move ordering function for a-b-pruning *)
-let order_random _ _ _ l =
+let order_random _ _ l =
   let l' = match Random.int 2 with 0 -> l | _ -> List.rev l in
   let f, b = List.fold_left 
     (fun (front,back) x -> match Random.int 2 with 
@@ -97,26 +123,18 @@ let order_random _ _ _ l =
 (* A more sophisticated move-ordering scheme *)
 (* The order of evaluation is:
   * 1. Moves that give you material advantage (several captures)
-  * 2. Moves that increase your evaluation function
+  * 2. Moves along the border (tend to do better)
   * 3. All other moves
 *)
-let order_heuristic eval_f s max (l:move_t list) : (move_t list) =
-  let b = s.board and turn = s.turn in
-  (* For <= turn 2, just use regular order func *)
-  if s.turn <= 2 then order_random eval_f s max l
-  else 
-    let cur_eval = eval_f s max in
-    let cap, eval, other = List.fold_left
-      (fun (cap, eval, other) mov -> match mov with
-       | Move (_,(_,i)) when i > 2 -> (mov :: cap, eval, other)
-       | m -> play !b s.turn m;
-             if (-(eval_f s @: not max)) > cur_eval 
-             then (rewind !b turn m; 
-                  cap, m::eval, other)
-             else (rewind !b turn m; 
-                  cap, eval, m::other))
-      ([],[],[]) l
-    in cap@eval@other
+let order_heuristic s max (l:move_t list) : (move_t list) =
+  let b = s.board in
+  let cap, border, other = List.fold_left
+    (fun (cap, border, other) -> function
+     | Move (_,(_,i)) as m when i > 2 -> (m::cap, border, other)
+     | m when is_border_move !b m     -> (cap, m::border, other)
+     | m                              -> (cap, border, m::other))
+    ([],[],[]) l
+  in cap@border@other
 
 (* Simple random choice algorithm *)
 let ai_random s moves =
@@ -143,7 +161,7 @@ let ai_minimax eval_f _ max_depth timeout s _ =
              else MoveValue (win_score, true)
 
        | _, d when d >= max_depth -> 
-             let e = eval_f s max in (* forced to use heuristic *)
+             let e = eval_f s max moves in (* forced to use heuristic *)
              rewind_move ();
              MoveValue (e, false)
 
@@ -195,7 +213,7 @@ let ai_alpha_beta eval_f m_order_f max_depth timeout s _ =
                   if max then MoveValue (-win_score, true) 
                   else MoveValue (win_score, true)
        | _, d when d >= max_depth -> 
-              let e = eval_f s max in (* forced to use heuristic *)
+              let e = eval_f s max moves in (* forced to use heuristic *)
               rewind_move ();
               MoveValue (e, false)
        | _, _ -> 
@@ -267,7 +285,7 @@ let rec get_ordered () =
   in match choice with 1 -> order_random | _ -> order_heuristic 
 
 let get_ai_fn ai = 
-  let eval_f = eval3 in
+  let eval_f = eval3_cheap in
   match ai with
   | MinimaxAI -> 
       let d = get_depth () in
@@ -275,14 +293,14 @@ let get_ai_fn ai =
   | AlphaBetaAI -> 
       let d = get_depth () in
       let ord_f = get_ordered () in
-      ai_alpha_beta eval_f (Some (ord_f eval_f)) d None
+      ai_alpha_beta eval_f (Some ord_f) d None
   | TimedMinimaxAI -> 
       let t = get_time () in
       ai_time_bounded ai_minimax t eval_f None
   | TimedAlphaBetaAI -> 
       let t = get_time () in
       let ord_f = get_ordered () in
-      ai_time_bounded ai_alpha_beta t eval_f (Some (ord_f eval_f))
+      ai_time_bounded ai_alpha_beta t eval_f (Some ord_f)
   | RandomAI -> ai_random
   | _ -> failwith "unhandled AI"
   
