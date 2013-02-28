@@ -278,14 +278,19 @@ let rec get_depth () =
 let rec get_time () =
   loop_input_int "Enter max time in seconds: " (fun i -> i > 0)
 
+let rec get_eval () =
+  let c = loop_input_int "Fast evaluation function (1), slow (2), or old (3) ?"
+    (function 1 | 2 | 3 -> true | _ -> false) in
+  match c with 1 -> eval3_cheap | 2 -> eval3 | _ -> evaluate_by_moves_detailed 
+
 let rec get_ordered () =
-  let choice = 
+  let c = 
     loop_input_int "Random evaluation order (1) or heuristic order (2) ?"
       (function 1 | 2 -> true | _ -> false)
-  in match choice with 1 -> order_random | _ -> order_heuristic 
+  in match c with 1 -> order_random | _ -> order_heuristic 
 
 let get_ai_fn ai = 
-  let eval_f = eval3_cheap in
+  let eval_f = get_eval () in
   match ai with
   | MinimaxAI -> 
       let d = get_depth () in
