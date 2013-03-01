@@ -253,11 +253,11 @@ let ai_alpha_beta eval_f m_order_f max_depth timeout s _ =
   in
   s, loop true s.turn 0 (-win_score,win_score) None
 
-let ai_time_bounded ai_f time_limit eval_f m_ord_f s moves = 
+let ai_time_bounded ai_f (time_limit:float) eval_f m_ord_f s moves = 
   let scanned = ref 0 in
   let start_time = Sys.time () in
   let rec loop depth last_res =
-    let time_limit = start_time +. (float_of_int time_limit) in
+    let time_limit = start_time +. time_limit in
     let _, res = 
       ai_f eval_f m_ord_f depth (Some time_limit) s [] in
     match res with
@@ -280,7 +280,7 @@ let rec get_depth () =
   loop_input_int "Enter a maximum depth: " (fun i -> i > 0)
 
 let rec get_time () =
-  loop_input_int "Enter max time in seconds: " (fun i -> i > 0)
+  loop_input_float "Enter max time in seconds: " (fun i -> i > 0.)
 
 let rec get_eval () =
   let c = loop_input_int "Fast evaluation function (1), slow (2), or old (3) ?"
