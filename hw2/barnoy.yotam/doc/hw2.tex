@@ -47,8 +47,8 @@
 			2 &  27  & 33  &    501 &   325 &    2446 &  1194 \\ \hline
 			3 &  63  & 29  &   3013 &  1420 &   19970 &  5684 \\ \hline
 			4 &  153 & 45  &  21332 &  4591 &  142491 & 22321 \\ \hline
-			5 &  370 & 80  & 157159 & 24396 &   0     &   0   \\ \hline
-			6 &  735 & 166 & 550525 & 57560 &	 	0     &   0   \\ \hline
+			5 &  370 & 80  & 157159 & 24396 &   -     &   -   \\ \hline
+			6 &  735 & 166 & 550525 & 57560 &	 	-     &   -   \\ \hline
 		\end{tabular}
 		\end{table}
 
@@ -153,17 +153,50 @@
 
 	Performance-wise, I probably became more worried about the performance than I needed to be. I tried to improve the expansion function since it's run so many times, but I forgot that I had been running in ocaml's bytecode mode, which is much slower than its native compilation mode. Native compilation proved to be much faster.
 
-\item 11. Player 1 has no weakly dominant strategy, though $z$ weakly dominates $y$. Player 2 has $p$ as a weakly dominant strategy.
+\item Comparing Iterative-Deepening versions:
+	 \begin{table}[h]
+		 \centering
+		 \begin{tabular}{|c|c|c|c|c|c|}
+			 \hline
+			 Board Size & seconds & Minimax depth & \( \alpha\beta \) depth & Minimax wins & \( \alpha\beta \) wins \\ \hline
+		 % s   sec       md       abd         mw     abw
+			 4 & 0.002 &   5.5   &   6    &    1    &  1      \\ \hline
+			 6 & 4     &   11.5  &  16.5  &    1    &  1      \\ \hline
+			 8 & 8     &   11    &  17.5    &         &  2      \\ \hline
+		\end{tabular}
+	\end{table}
 
-\item 12. Player 1 has $x$ as a strongly dominant strategy. Player 2 has no strongly dominant strategy.
+\item The data shows that, within the same amount of time, $\alpha\beta$ is able to search much deeper than Minimax. This is to be expected. What's disappointing is that $\alpha\beta$ is unable to triumph over Minimax (in grids bigger than $4\times4$) even with many more search levels at a grid size of 4. At a grid size of $8\times8$, $\alpha\beta$ has a large enough advantage that it's able to defeat Minimax even when playing as black. 
 
-\item 13. There are Nash equilibria at $(x,p)$ and $(x, r)$. 
+\item Comparing $\alpha\beta$ pruning algorithms with different orderings:
+	 \begin{table}[h]
+		 \centering
+		 \begin{tabular}{|c|c|c|c|}
+			 \hline
+			 Board Size   & bound   & naive nodes & heuristic nodes \\ \hline
+			 4 & time 2ms &   838   &   674   \\ \hline
+			 6 & time 4s  & 698298  & 559655  \\ \hline
+			 6 & depth 10 & 1395029 & 1605618 \\ \hline
+		\end{tabular}
+	\end{table}
 
-\item 14. Player 1 has no weakly dominant strategy. Player 2 has no weakly dominant strategy.
+\item The table shows that my heuristic ordering doesn't necessarily do an amazing job of figuring out which nodes to choose first. I implement the naive ordering as a random permutation of the expanded move list, so it appears that sometimes random ordering is better and sometimes worse. 
 
-\item 15. Player 1 has no strongly dominant strategy. Player 2 has no strongly dominant strategy.
+	My ordering heuristic involves giving highest priority to moves that involve a material gain (capturing 2 or more pieces), medium priority to moves around the edges as these seem to be more important than others (edges limit the ability of the opponent to mobilize pieces) and lowest priority to other moves. This doesn't seem to be particularly effective, or perhaps it's not sufficiently connected to my heuristic.
 
-\item 16. There are Nash equilibria at $(x,p)$ and at $(y,s)$.
+\item Pitting the naive vs the heuristic ordering $\alpha\beta$ algorithm (using the same parameters) had the following results: the naive algorithm won 5 games (as white) and the heuristic ordering agent won 5 games (also as white). I didn't expect either agent to do particularly better, since the tests above showed that neither was particularly effective at reducing the number of nodes that had to be checked -- if anything, perhaps random move sorting was better. In order to have a sufficient advantage to make one agent win over another, a move ordering needs to be so good that it allows the $\alpha\beta$ pruning algorithm to be significantly more efficient. This didn't happen with my move ordering heuristic. 
+
+\item Player 1 has no weakly dominant strategy, though $z$ weakly dominates $y$. Player 2 has $p$ as a weakly dominant strategy.
+
+\item Player 1 has $x$ as a strongly dominant strategy. Player 2 has no strongly dominant strategy.
+
+\item There are Nash equilibria at $(x,p)$ and $(x, r)$. 
+
+\item Player 1 has no weakly dominant strategy. Player 2 has no weakly dominant strategy.
+
+\item Player 1 has no strongly dominant strategy. Player 2 has no strongly dominant strategy.
+
+\item There are Nash equilibria at $(x,p)$ and at $(y,s)$.
 \end{enumerate}
 
 \end{document}
