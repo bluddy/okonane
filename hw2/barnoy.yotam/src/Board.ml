@@ -237,10 +237,12 @@ let expand b turn =
   let otherc = other_color color in
   match turn with
   | 1 -> 
+      (*print_endline "expanding 1"; [> debug <]*)
     let s = b.size in let halfs = s/2 in
     let crossboard = [0; halfs - 1; halfs; s - 1] in
     List.map (fun x -> Remove (x, x)) crossboard
   | 2 ->
+      (*print_endline "expanding 2"; [> debug <]*)
     let fourdirs (x,y) = [x-1,y; x+1,y; x,y-1; x,y+1] in
     (* 1.get gaps 2.move in all directions 3.clamp 4.compare color *)
     let gaps = get_squares b Empty in
@@ -249,6 +251,7 @@ let expand b turn =
     List.map (fun (a,b) -> Remove (a,b)) whites
 
   | t ->
+      (*print_endline @: "expanding "^string_of_int t; [>debug<]*)
       let dirs = [DirUp,0; DirDown,0; DirLeft,0; DirRight,0] in
       let (n_p, pieces, n_e, empty) = get_squares_empty b color in
       let adjs =  (* if there are fewer empties, use those *)

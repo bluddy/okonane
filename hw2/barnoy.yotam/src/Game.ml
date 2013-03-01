@@ -97,10 +97,9 @@ let rec player_turn state moves =
 (* The main loop of a single game *)
 let main_loop silent state =
   let rec loop olds (w_nodes, b_nodes) =
-  let new_turn = olds.turn + 1 in
-  let s = {olds with turn = new_turn} in
+  let s = {olds with turn = olds.turn + 1} in
   match expand !(s.board) s.turn with
-   | [] -> let color = color_of_turn olds.turn in
+   | [] -> let color = color_of_turn olds.turn in (* color of last turn *)
            let color_s = string_of_color color in
            print_newline ();
            print_board s;

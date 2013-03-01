@@ -27,19 +27,18 @@ let material_score = 20
 let move_score = 2
 
 (* evaluate the board by the number of possible actions each player has *)
-let evaluate_by_moves s max moves =
-  if s.turn <= 2 then 0  (* can't evaluate such an early turn *)
+let evaluate_by_moves b max turn moves =
+  if turn <= 2 then 0  (* can't evaluate such an early turn *)
   else
     let mov_num = List.length @: moves in
-    let mov_num' = List.length @: expand !(s.board) @: s.turn+1 in
+    let mov_num' = List.length @: expand !b @: turn+1 in
     let e = mov_num - mov_num' in
     if max then e else -e
 
 (* more accurate evaluation: compares to avg of next turn's # moves *)
-let evaluate_by_moves_detailed s max moves =
-  if s.turn <= 2 then 0 (* can't evaluate such an early turn *)
+let evaluate_by_moves_detailed b max turn moves =
+  if turn <= 2 then 0 (* can't evaluate such an early turn *)
   else
-    let b = s.board and turn = s.turn in
     let total = List.fold_left 
       (fun tot m -> play !b turn m; 
         let num_moves = List.length @: expand !b (turn + 1) in
@@ -61,12 +60,12 @@ let score_of_pos num_ortho_moves num_pieces num_moves =
     num_pieces * material_score +
     num_moves * move_score
 
-let eval3 s max moves =
+let eval3 b max turn moves =
   let report i = if max then i else -i in
-  if s.turn <= 2 then 0 (* can't evaluate such an early turn *)
+  if turn <= 2 then 0 (* can't evaluate such an early turn *)
   else
-    let b = s.board and turn = s.turn in
-    let num_pieces = get_num_squares !b @: Board.color_of_turn turn in
+    let color = Board.color_of_turn turn in
+    let num_pieces = get_num_squares !b color in
     if list_null moves then report (-win_score)
     else
       let num_moves = List.length moves in
@@ -74,26 +73,28 @@ let eval3 s max moves =
       let max_set_size = snd @: list_max ortho_sets List.length in
       let my_score = score_of_pos max_set_size num_pieces num_moves in
       let his_score = snd @: list_min moves @: 
-          fun m -> with_turn !b turn m @:
-            fun () -> 
+        fun move -> 
+              (*print_endline @: "playing "^string_of_int turn^", "^*)
+                (*string_of_square color; [> debug <]*)
+              play !b turn move;
               let turn' = turn + 1 in
               let his_pieces = 
                 get_num_squares !b @: Board.color_of_turn turn' in
               match expand !b turn' with
-              | [] -> win_score (* we win *)
+              | [] -> rewind !b turn move; win_score (* we win *)
               | m ->
                 let num_his_moves = List.length m in
                 let his_ortho_sets = ortho_move_sets m in
                 let max_set_size = snd @: list_max his_ortho_sets List.length in
+                rewind !b turn move;
                 score_of_pos max_set_size his_pieces num_his_moves in
       report @: my_score - his_score
 
 (* a cheaper version of the eval function *)
-let eval3_cheap s max moves =
+let eval3_cheap b max turn moves =
   let report i = if max then i else -i in
-  if s.turn <= 2 then 0 (* can't evaluate such an early turn *)
+  if turn <= 2 then 0 (* can't evaluate such an early turn *)
   else
-    let b = s.board and turn = s.turn in
     let num_pieces = get_num_squares !b @: Board.color_of_turn turn in
     if list_null moves then report (-win_score)
     else
@@ -161,7 +162,7 @@ let ai_minimax eval_f _ max_depth timeout s _ =
              else MoveValue (win_score, true)
 
        | _, d when d >= max_depth -> 
-             let e = eval_f s max moves in (* forced to use heuristic *)
+             let e = eval_f brd max turn moves in (* forced to use heuristic *)
              rewind_move ();
              MoveValue (e, false)
 
@@ -212,10 +213,12 @@ let ai_alpha_beta eval_f m_order_f max_depth timeout s _ =
        | [], _ -> rewind_move ();
                   if max then MoveValue (-win_score, true) 
                   else MoveValue (win_score, true)
+
        | _, d when d >= max_depth -> 
-              let e = eval_f s max moves in (* forced to use heuristic *)
+              let e = eval_f brd max turn moves in (* forced to use heuristic *)
               rewind_move ();
               MoveValue (e, false)
+
        | _, _ -> 
          let (i, m, last, seen_all_l) = if max then
              foldl_until
