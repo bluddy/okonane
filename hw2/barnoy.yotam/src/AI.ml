@@ -294,19 +294,22 @@ let rec get_ordered () =
   in match c with 1 -> order_random | _ -> order_heuristic 
 
 let get_ai_fn ai = 
-  let eval_f = get_eval () in
   match ai with
   | MinimaxAI -> 
+      let eval_f = get_eval () in
       let d = get_depth () in
       ai_minimax eval_f None d None
   | AlphaBetaAI -> 
+      let eval_f = get_eval () in
       let d = get_depth () in
       let ord_f = get_ordered () in
       ai_alpha_beta eval_f (Some ord_f) d None
   | TimedMinimaxAI -> 
+      let eval_f = get_eval () in
       let t = get_time () in
       ai_time_bounded ai_minimax t eval_f None
   | TimedAlphaBetaAI -> 
+      let eval_f = get_eval () in
       let t = get_time () in
       let ord_f = get_ordered () in
       ai_time_bounded ai_alpha_beta t eval_f (Some ord_f)
