@@ -6,7 +6,8 @@ type player_color_t = BlackP | WhiteP
 type seen_all_t = bool
 type move_value_t = int
 type nodes_seen_t = int
-type return_t = MoveChoice of move_t * move_value_t * nodes_seen_t * seen_all_t
+type max_depth_t = int
+type return_t = MoveChoice of move_t * move_value_t * nodes_seen_t * seen_all_t * max_depth_t
               | MoveValue of move_value_t * seen_all_t
               | TimeOut
 
@@ -33,3 +34,10 @@ let rec loop_input_int prompt f =
     if f i then i else fail ()
   with Failure _ -> fail ()
 
+let rec loop_input_float prompt f =
+  let fail () = print_endline "Bad input\n"; loop_input_float prompt f in
+  print_string prompt;
+  try 
+    let i = read_float () in
+    if f i then i else fail ()
+  with Failure _ -> fail ()
