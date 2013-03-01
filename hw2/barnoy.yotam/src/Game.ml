@@ -139,26 +139,31 @@ let main_loop silent state : stat_t =
          (* get ai/player's moves *)
          begin match player_fn s moves with
          | new_s, MoveChoice(move, value, num_seen, _, depth) ->
-             (if not @: is_human player then 
+             let ai_stuff () =
                let delta = Sys.time () -. time in
                (print_endline @: "Considered "^string_of_int num_seen^
                " moves in "^string_of_float delta^" seconds. Move has value "^
                 string_of_int value);
-             (* double check that we got a legit move back *)
-             if not @: List.exists ((=)move) moves then 
-               (print_endline @: "Illegal move: "^
-               string_of_move move; print_board new_s);
-             play !(new_s.board) new_s.turn move;
-             print_endline @: color_str^" "^string_of_move move;
-             print_newline ());
-             begin match color with
-              | WhiteP -> loop new_s 
-                {st with w_nodes = st.w_nodes + num_seen;
-                         w_depth = max st.w_depth depth}
-              | BlackP -> loop new_s 
-                {st with b_nodes = st.b_nodes + num_seen; 
-                         b_depth = max st.b_depth depth}
-             end
+               (* double check that we got a legit move back *)
+               if not @: List.exists ((=)move) moves then 
+                 (print_endline @: "Illegal move: "^
+                 string_of_move move; print_board new_s; ())
+               else () in
+             let both () = 
+               play !(new_s.board) new_s.turn move;
+               print_endline @: color_str^" "^string_of_move move;
+               print_newline ();
+               begin match color with
+                | WhiteP -> loop new_s 
+                  {st with w_nodes = st.w_nodes + num_seen;
+                           w_depth = max st.w_depth depth}
+                | BlackP -> loop new_s 
+                  {st with b_nodes = st.b_nodes + num_seen; 
+                           b_depth = max st.b_depth depth}
+               end
+             in if is_human player then both ()
+                else (ai_stuff (); both ())
+
          | _, _ -> failwith "player returned bad value"
          end
   in loop state empty_stat
