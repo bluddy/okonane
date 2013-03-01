@@ -1,4 +1,4 @@
-Aritificial Intelligence HW 1: Search
+Aritificial Intelligence HW 2: Game Play
 
 Yotam Barnoy
 
@@ -7,30 +7,35 @@ Files:
 _tags         - Used by the ocamlbuild system.
 run.sh        - Runs bin/Main.native
 compile.sh    - Compiles using the ocamlbuild system.
-src/Main.ml   - The main file of the program. Calls the search function.
-src/Grid.ml   - Handles all grid-related functionality.
-src/Search.ml - contains a function for each type of search
+src/Main.ml   - The main file of the program. Interprets command line parameters 
+								and calls the main game loop.
+src/AI.ml		  - Handles all AI routines and evaluation functions.
+src/Board.ml  - Handles functionality related to the board.
+src/Game.ml   - The main routines for instantiating and managing a game.
+src/GameState.ml - Contains the data structures used by both AI and Game and 
+						    prevents circular module references.
 src/Util.ml   - Different utility functions that I've personally written. These copy some of Haskell's API functionality.
-src/Batteries - Contains data structure implementations from batteriesincluded.org
-			    (ocaml lacks a rich API and so I borrowed some data structures from the biggest source of ocaml libraries without including the whole library)
-src/Batteries/batHeap.ml - Batteries Included' implementation of a binomial heap.
-src/Batteries/batInterfaces.ml - interface needed to create flexible instances of Batteries Included data structures.
-doc/hw1.tex   - Latex file for the written part of the homework.
-doc/hw1.pdf   - PDF file
+doc/hw2.tex   - Latex file for the written part of the homework.
+doc/hw2.pdf   - PDF file
 
 To build: run compile.sh. This will invoke the ocamlbuild system.
-To run: run run.sh. The possible parameters will be presented.
+To run: run run.sh
+	- Silent operation is possible by invoking 'run.sh -s'. This allows for batch games with summary statistics.
 
-Run times and algorithm details
--------------------------------
-Every problem instance except for map6.txt runs in 1-2ms using every algorithm.
+You will be prompted to choose the size of the board, which side you want to play, and which AIs you would like to use for the AI players (if any). Once the game starts, you can change AI parameters by entering 'z', or choose a piece to move by writing the coordinates of the piece ('a1' or '1a'), at which point you'll be prompted with the possible locations to which the piece can be moved (from which you choose using a number).
 
-Map6.txt can be handled by BFS-like algorithms (ie. also bi-directional search) because they map out the full graph and look it up in a hashtable. Every other algorithm is unable to cope with map6 in the time I've tried to measure it. I could have kept information about every node in a hashtable for A* and for DFS, but that would defeat their purpose. I'm not sure if any other algorithm but BFS was supposed to be able to finish map6, but it makes sense to me that they take a very very long time. Actually, I was surprised at how poorly A* did, but now that I've learned more about it, it makes sense as well.
+The code is organized around the Game.ml module, which, as in all ocaml code, is organized bottom to top. start_game is where the game starts. It asks for input and loops over the requested number of games. To play more than 1 game, you must invoke the program with the '-s' (silent) parameter. 
 
-Nevertheless, both DFS and A* use hashtables as well. DFS keeps every node it's seen in the past branch (loop detection) in a hashtable for amortized O(1) lookup, and A* uses a hashtable to make sure it's not re-adding a square of equal cost to its priority queue. 
+start_game calls the AI module's modify_ai() function to fill in any missing AI players. It receives both the constructor of the respective AI and the function for that AI. Storing the function is critical, as many functions are curried with extra information like the evaluation function before being returned to the Game module. 
 
+main_loop() is called by start_game() once everything is ready. It increases the turn counter and checks if the last player to go won. If not, it invokes the funciton of the next player. player_turn() handles player input for a player turn, while the functions in the AI module handle AI turns.
 
+Within the AI module, each AI type has its own function (ai_alpha_beta, ai_minimax, ai_random) while the time bounded AI is implemented by another function (ai_time_bounded) that can take any one of the first 3 functions. Several evaluation functions are in the file -- I went through a few of them before I settled on 2 main ones -- eval3_cheap and eval3.
 
+The Board module contains a function to initialize a board (make_default), stringification functions, functions converting between tuples and directions, functions finding orthogonal (non-overlapping) moves for the AI (moves_overlap, find_conflicts and ortho_move_sets) as well as the key functions expand, play and rewind. 
 
+Expand functions as it does in every search program. It tries to be relatively efficient rather than brute force, examining either the empty spots or the player's pieces first (whichever are fewer) and working from there. Moves are confined to the board and then iteratively extended so long as there is where to extend them to.
+
+Play and rewind do exactly that -- they play and rewind a move on the board. To avoid allocating the board array over and over, only one array is ever used, and every move that is examined is first played on top of the board and then 'rewound'. A convenience function, 'with_turn', is used in some cases to ensure that plays always have a matching rewind.
 
 
