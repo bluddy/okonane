@@ -140,7 +140,7 @@ let order_heuristic s max (l:move_t list) : (move_t list) =
 (* Simple random choice algorithm *)
 let ai_random s moves =
   let choice = Random.int @: List.length moves in
-  s, MoveChoice (List.nth moves choice, 0, 1, true)
+  s, MoveChoice (List.nth moves choice, 0, 1, true, 1)
 
 (* minimax algorithm *)
 let ai_minimax eval_f _ max_depth timeout s _ =
@@ -187,7 +187,7 @@ let ai_minimax eval_f _ max_depth timeout s _ =
            rewind_move ();
            match move, last with
             | _, TimeOut -> TimeOut
-            | None, _    -> MoveChoice (m, i, !scanned, seen_all)
+            | None, _    -> MoveChoice (m, i, !scanned, seen_all, max_depth)
             | Some _, _  -> MoveValue (i, seen_all)
   in
   s, loop true s.turn 0 None 
@@ -249,7 +249,7 @@ let ai_alpha_beta eval_f m_order_f max_depth timeout s _ =
          match move, last with
           | _, TimeOut -> TimeOut
           | Some _, _  -> MoveValue (i, seen_all)
-          | None,   _  -> MoveChoice (m, i, !scanned, seen_all)
+          | None,   _  -> MoveChoice (m, i, !scanned, seen_all, max_depth)
   in
   s, loop true s.turn 0 (-win_score,win_score) None
 
@@ -263,17 +263,18 @@ let ai_time_bounded ai_f time_limit eval_f m_ord_f s moves =
     match res with
      | TimeOut -> s, last_res
 
-     | MoveChoice (move, value, num_scanned, true) -> 
+     | MoveChoice (move, value, num_scanned, true, _) -> 
          (* we've explored the whole tree *)
          scanned := !scanned + num_scanned; 
-         s, MoveChoice (move, value, !scanned, true)
+         s, MoveChoice (move, value, !scanned, true, depth)
 
-     | MoveChoice (move, value, num_scanned, false) -> 
+     | MoveChoice (move, value, num_scanned, false, _) -> 
          scanned := !scanned + num_scanned; 
-         loop (depth+1) @: MoveChoice (move, value, !scanned, false)
+         loop (depth+1) @: MoveChoice (move, value, !scanned, false, depth)
 
      | _ -> failwith "error in ai_time_bounded"
-  in loop 1 @: MoveChoice (List.hd moves, 0, 0, false) (* a crappy default choice *)
+  in loop 1 @: MoveChoice (List.hd moves, 0, 0, false, 0) 
+                          (* a crappy default choice *)
 
 let rec get_depth () = 
   loop_input_int "Enter a maximum depth: " (fun i -> i > 0)
