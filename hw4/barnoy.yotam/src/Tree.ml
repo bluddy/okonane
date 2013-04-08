@@ -6,13 +6,13 @@ open Data
 
 type attrib_t = int
 type 'a val_t = Node of 'a * ('a tree_t)
-              | Leaf of 'a
+              | Leaf of 'a * label_t
 and 'a tree_t = attrib_t * ('a val_t) list
 
 (* stringification functions *)
 let rec string_of_val = function
   | Node(s, t) -> "Node("^s^", "^string_of_tree t^")"
-  | Leaf s     -> "Leaf("^s^")"
+  | Leaf(s, l) -> "Leaf("^s^": "^l^")"
 
 and string_of_vals = function
   | []  -> ""
@@ -27,7 +27,7 @@ and string_of_tree (a, vl) =
 
 (* read a portion of the string relating to val. 
  * Return val and the rest of the string *)
-let rec val_of_string s : (string val_t * string) = 
+(* let rec val_of_string s : (string val_t * string) = 
   let r =  Str.regexp("Node(\\([^,]*\\), \\(.*\\)") in
   if Str.string_match r s 0 then 
     let v, s' = Str.matched_group 1 s, Str.matched_group 2 s in
@@ -63,18 +63,20 @@ and tree_of_string s : (string tree_t * string) =
     | "])" -> (int_of_string a, vs), string_drop 2 s''
     | _    -> invalid_arg "tree_of_string: Missing ])"
   else invalid_arg "tree_of_string: Tree mismatch"
+*)
 
 (* convert data to a tree using entropy *)
-let tree_of_data list_data : string tree_t =
+let tree_of_data ?(print=false) list_data : string tree_t =
+  if print then Printf.printf "Read %d entries\n" (List.length list_data);
   let len = Array.length @: snd @: list_head list_data in
   let rec loop l =
     let min_i, min_e = find_min_entropy len l in
     let split = split_data l min_i in
     let vals = list_map (fun (value, data) ->
         match get_label_counts data with
-        | []  -> invalid_arg "Problem in tree_of_data"
-        | [x] -> Leaf value (* only one label type *)
-        | xs  -> Node(value, loop data)
+        | []    -> invalid_arg "Problem in tree_of_data"
+        | [l,x] -> Leaf(value, l) (* only one label type *)
+        | xs    -> Node(value, loop data)
       ) split
     in min_i, vals
   in

@@ -16,31 +16,39 @@ let hfind hash x = try Some(Hash.find hash x) with Not_found -> None
 let qpop q = try Some(Q.pop q) with Q.Empty -> None
 let spop s = try Some(S.pop s) with S.Empty -> None
 
+let count = ref 0 
+
 let search is_stack f_create f_push f_pop max_depth grid = 
     let hash = Hash.create 100 in (* hashtable for efficiency *)
     let expanded = ref 0 in
     let q = f_create () in
     let rec loop loc cost path past_depth = 
+        print_endline @: string_of_loc loc;
+        if loc = (97,9997) then exit 1;
         let rec goto_next past = match f_pop q with
             | None when past -> MaxDepth
             | None -> NoPath !expanded
             | Some (Node(next, cost, path)) -> loop next cost path past
-            | Some (Delete x) -> Hash.remove hash x; goto_next past
+            | Some (Delete x) -> print_endline @: "delete "^string_of_loc x; Hash.remove hash x;
+            count := !count + 1; if !count >= 110 then exit 1 else goto_next past
         in
         let new_path = loc::path in
         match (hfind hash loc, max_depth) with
          | None, _ -> goto_next past_depth (* already dealt with this node *)
-         | Some cost', _ when cost' <> cost -> goto_next past_depth
+         (*| Some cost', _ when cost' <> cost -> goto_next past_depth*)
          | Some _, Some depth when List.length new_path > depth -> goto_next true
          | Some _, _ when loc = grid.goal -> SomePath (List.rev new_path, cost, !expanded)
          | Some _, _ ->
             let options = expanded := !expanded + 1; 
-                          expand grid loc in
+                    print_endline @: "expand "^string_of_loc loc;
+                    expand grid loc in
             let update_q_hash (x, c) = 
                 let new_cost = c + cost in
                 match hfind hash x with 
-                 | Some old_cost when old_cost <= new_cost -> ()
+                 | Some old_cost when old_cost <= new_cost -> print_endline @:
+                     "old"^string_of_loc loc; 
                  | Some _ | None -> 
+                         print_endline @: "adding "^string_of_loc x;
                          Hash.replace hash x new_cost; 
                          f_push (Node (x, new_cost, new_path)) q
             in
