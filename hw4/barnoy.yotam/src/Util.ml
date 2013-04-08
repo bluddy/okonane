@@ -125,6 +125,16 @@ let list_intersperse la lb =
     | [], []       -> acc
   in List.rev @: loop [] la lb
 
+(* modify/add to an association list generically *)
+let assoc_modify f item l =
+  try
+    let a = List.assoc item l in
+    let rest = List.remove_assoc item l in
+    (item, f (Some a))::rest
+  with 
+    Not_found -> (item, f None)::l
+
+
 (* find the maximum element of a list according to a transformation function (to int) *)
 let list_minmax op l f = match l with
   | [x]   -> (x, f x)

@@ -2,8 +2,9 @@
 
 open Util
 open Str
+open Data
 
-type attrib_t = string
+type attrib_t = int
 type 'a val_t = Node of 'a * ('a tree_t)
               | Leaf of 'a
 and 'a tree_t = attrib_t * ('a val_t) list
@@ -22,7 +23,7 @@ and string_of_vals = function
       list_tail vl
 
 and string_of_tree (a, vl) =
-  "Tree("^a^", ["^string_of_vals vl^"])"
+  "Tree("^string_of_int a^", ["^string_of_vals vl^"])"
 
 (* read a portion of the string relating to val. 
  * Return val and the rest of the string *)
@@ -59,11 +60,24 @@ and tree_of_string s : (string tree_t * string) =
     let a, s' = Str.matched_group 1 s, Str.matched_group 2 s in
     let vs, s'' = vals_of_string s' in
     match string_take 2 s'' with 
-    | "])" -> (a, vs), string_drop 2 s''
+    | "])" -> (int_of_string a, vs), string_drop 2 s''
     | _    -> invalid_arg "tree_of_string: Missing ])"
   else invalid_arg "tree_of_string: Tree mismatch"
 
-
-
+(* convert data to a tree using entropy *)
+let tree_of_data list_data : string tree_t =
+  let len = Array.length @: snd @: list_head list_data in
+  let rec loop l =
+    let min_i, min_e = find_min_entropy len l in
+    let split = split_data l min_i in
+    let vals = list_map (fun (value, data) ->
+        match get_label_counts data with
+        | []  -> invalid_arg "Problem in tree_of_data"
+        | [x] -> Leaf value (* only one label type *)
+        | xs  -> Node(value, loop data)
+      ) split
+    in min_i, vals
+  in
+  loop list_data
 
 
