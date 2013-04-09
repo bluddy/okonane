@@ -71,9 +71,14 @@ let get_entropy l index =
     0.
     counts 
   
-let find_min_entropy len l =
+(* find the lowest entropy attribute *)
+let min_entropy attributes l =
+  list_minmax (<) attributes (get_entropy l)
+
+let min_entropy_range len l =
   let r = create_range 0 len in
-  list_minmax (<) r (get_entropy l)
+  min_entropy r l
+
 
 
 

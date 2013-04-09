@@ -68,18 +68,28 @@ and tree_of_string s : (string tree_t * string) =
 (* convert data to a tree using entropy *)
 let tree_of_data ?(print=false) list_data : string tree_t =
   if print then Printf.printf "Read %d entries\n" (List.length list_data);
-  let len = Array.length @: snd @: list_head list_data in
-  let rec loop l =
-    let min_i, min_e = find_min_entropy len l in
+  let len = Array.length @: snd @: list_head list_data
+  in
+  let rec loop l attributes =
+    let min_i, min_e = min_entropy attributes l in
+    let rem_attrib = List.filter 
+      (function i when i=min_i -> false | _ -> true) attributes in
     let split = split_data l min_i in
-    let vals = list_map (fun (value, data) ->
-        match get_label_counts data with
-        | []    -> invalid_arg "Problem in tree_of_data"
-        | [l,x] -> Leaf(value, l) (* only one label type *)
-        | xs    -> Node(value, loop data)
+    let vals = 
+      list_map (fun (value, data) ->
+        match get_label_counts data, rem_attrib with
+        | [], _   -> invalid_arg "Problem in tree_of_data"
+        (* case of only one label type remaining *)
+        | [l,x],_ -> Leaf(value, l)
+        (* case of no attributes left: take majority *)
+        | xs, []  -> let maxl, _ = fst @: list_max xs snd in
+                     Leaf(value, maxl)
+        (* more attributes to choose: loop *)
+        | xs, _   -> Node(value, loop data rem_attrib)
       ) split
     in min_i, vals
   in
-  loop list_data
+  let r = create_range 0 len in
+  loop list_data r
 
 
