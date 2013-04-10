@@ -1,5 +1,13 @@
 (* Utilities that are useful *)
 
+(* abbreviations for annoyingly long functions *)
+let foi = float_of_int
+let iof = int_of_float
+let soi = string_of_int
+let sof = string_of_float
+let ios = int_of_string
+let fos = float_of_string
+
 (* low precedence function application allows us to remove 
  * many () from our code *)
 let (@:) f x = f x;;
@@ -125,6 +133,10 @@ let list_intersperse la lb =
     | [], []       -> acc
   in List.rev @: loop [] la lb
 
+(* functions without exceptions *)
+let list_find f l = try Some(List.find f l) 
+  with Not_found -> None
+
 (* modify/add to an association list generically *)
 let assoc_modify f item l =
   try
@@ -199,4 +211,10 @@ let string_drop i s = let l = String.length s in
 let maybe def f = function
   | None -> def
   | Some x -> f x
+
+(* efficient function to get unique entities *)
+let nub xs =
+    let blank = Hashtbl.create (List.length xs) in
+    List.iter (fun x -> Hashtbl.replace blank x ()) xs;
+    Hashtbl.fold (fun h () t -> h :: t) blank []
 
