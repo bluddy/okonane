@@ -111,6 +111,21 @@ let insert_idx_snd first xs =
 (* tail recursive, so more efficient than mapping alone *)
 let list_map f l = List.rev @: List.rev_map f l
 
+(* calls f on its output over and over, num times *)
+let iterate f init num = 
+  let rec loop acc = function
+    | i when i<= 0 -> acc
+    | i -> loop (f acc) (i-1)
+  in loop init num
+
+(* repeat a function many times, building a list from indices *)
+(* do this without instantiating the index list *)
+let build_list_from_index f first num = 
+  List.rev @: snd @: iterate 
+    (fun (i, acc) -> i+1, (f i)::acc)
+    (0, [])
+    num
+
 (* transform a list into a list of lists of i elements *)
 (* if there aren't enough elements to fill the last list, it's filled as much as
  * possible *)
