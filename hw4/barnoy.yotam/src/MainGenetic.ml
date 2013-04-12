@@ -1,13 +1,14 @@
 open Util
 open Data
-open Tree
+open Test
 open Genetic
+open MainCommon
 
 let error s = prerr_endline s; exit 1
 
 let debug = ref false
-let train_file = ref ""
-let test_file = ref ""
+let file = ref ""
+let k = ref 10 (* k-folding *)
 let params = ref default_params
 
 (* gets the option of any option with an assoc list *)
@@ -37,6 +38,12 @@ let set_pop_size i = set_optv i @: fun p x -> {p with pop_size = x}
 let set_selection_fn s = set_optl selection_opts s @:
   fun p x -> {p with selection_fn = x}
 
+let set_t_size i = set_optv i @: fun p x -> 
+  {p with tournament_size = x}
+
+let set_t_winners i = set_optv i @: fun p x -> 
+  {p with tournament_winners = x}
+
 let set_mutation_p f = set_optv f @: fun p x -> {p with mutation_p = x}
 
 let set_crossover_p f = set_optv f @: fun p x -> {p with crossover_p = x}
@@ -59,9 +66,8 @@ let set_delta_gen i = set_optv i @: fun p x ->
 
 let param_specs = Arg.align 
     [
+        "-k", Arg.Set_int k, " Number of folds for k-folds";
         "-d", Arg.Set  debug, " Show debug information";
-        "-t", Arg.Set_string train_file, " File with which to train";
-        "-e", Arg.Set_string test_file, " File with which to test";
         "-size", Arg.Int set_pop_size, " Population Size";
         "-pbuild", Arg.Float set_build_p, " Tree building probability";
         "-fit", Arg.String set_fitness_fn, " Fitness function";
@@ -73,13 +79,13 @@ let param_specs = Arg.align
         "-gen", Arg.Int set_generations, " Number of generations";
         "-delta", Arg.Float set_delta, " Minimum delta to continue";
         "-deltagen", Arg.Int set_delta_gen, " Num of generations to wait for delta";
+        "-tsize", Arg.Int set_t_size, " Tournament size";
+        "-twin", Arg.Int set_t_win, " Tournament winners";
     ]
-
-let parse_cmd_line () = Arg.parse param_specs (fun str -> ()) ""
 
 let usage_msg = 
   let disp opts = String.concat "\n" @: List.map fst opts in
-  "ga -t train_file -e test_file [parameters]"^
+  "genetic file [parameters]"^
      "\nFitness functions:\n"^ disp fitness_opts^
      "\nSelection functions:\n"^disp selection_opts^
      "\nReplacement functions:\n"^disp replacement_opts^
@@ -88,14 +94,15 @@ let usage_msg =
        or use e.g. -delta 0.01 -deltagen 100 to determine the minimum delta\
        before terminating"
 
+let parse_cmd_line () = Arg.parse param_specs (fun str -> file := str) usage_msg
+
 let main () = 
   parse_cmd_line ();
-  if !train_file = "" then
+  if !file = "" then
     (Arg.usage param_specs usage_msg; error "\nNo input files specified");
-  let d = load_data true "," !train_file in
-  let t = tree_of_data ~print:true !use_gr d in
-  let s = string_of_tree t in
-  print_string s
+  let d = load_data true "," !file in
+  let results = k_fold !k d (genetic_run !debug) test in
+  print_results_all results
 
 let _ = main ()
 

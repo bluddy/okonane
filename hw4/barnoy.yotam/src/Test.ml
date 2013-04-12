@@ -20,7 +20,7 @@ let classify tree vector =
   in
   loop tree
 
-let classify_data tree l = list_map (classify tree) l
+let classify_all tree l = list_map (classify tree) l
 
 (* calculate the accuracy for a set of labels and classification outputs *)
 (* l is a zipped list of labels, outputs *)
@@ -81,5 +81,55 @@ let print_conf_matrix (labels, matrix) =
           Printf.printf "%10d" matrix.(i).(j))
         numbered;
       print_newline ())
-    numbered;
+    numbered
+
+(* do k-fold cross validation *)
+let k_fold k data train_fn test_fn =
+  let size = data / k in
+  let rec loop i before fold after results =
+    match fold with 
+    | [] -> results
+    | _  ->
+      print_endline "Fold "^soi i^": training... ";
+      let train_data = before@after in
+      let tree = train_fn train_data in
+      print_endline "testing on training data... ";
+      let res1 = test_fn tree train_data in
+      print_endline "testing on test data... ";
+      let res2 = test_fn tree fold in
+      loop (i+1) (before@fold) (list_take size after) 
+        (list_drop size after) ((res1,res2)::results) in
+  List.rev @: loop 1 [] (list_take size data) (list_drop size data) []
+
+(* run a single test of the data *)
+let test tree data = 
+  let classes = classify_all tree data in
+  let labels = list_map fst data in
+  let l = list_zip labels classes in
+  let acc = accuracy l in
+  let prec, recall = avg_prec_recall l in
+  let confm = confusion_matrix l in
+  (acc, prec, recall, confm)
+
+(* print test results to the screen *)
+let print_results (acc, prec, recall, confm) =
+  Printf.printf "Acc:%5f, Prec:%5f, Reca:%5f" acc prec recall
+
+(* prints the output of a k-fold *)
+let print_results_all rs =
+  print_endline "Results:\n\
+                 ----------------------------"
+  let rs' = insert_idx_fst 1 rs in
+  List.iter (fun (i,((_,_,_,tm) as train, (_,_,_,em) as test)) -> 
+      Printf.printf "Fold %i: ----------------------------- \n" i  
+      print_string "Train data: ";
+      print_results train;
+      print_newline ();
+      print_string "Test  data: ";
+      print_results test
+      print_string "\n\n"
+      print_conf_matrix em; (* only print conf matrix for test data *)
+      print_newline ();
+    ) rs'
+
 

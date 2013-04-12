@@ -211,7 +211,7 @@ let best_fitness pop = list_take 1 @: sort_descend_fst pop
 (* ------- main function -------- *)
 
 (* start a run of the genetic algorithm *)
-let genetic_run params data =
+let genetic_run print params data =
   let p = params in
   (* calculate the number of trees we need to keep and to recombine *)
   let keep_num = 
@@ -269,7 +269,7 @@ let genetic_run params data =
             if gen - old_g >= max_g then best, best_tree (* we're done *)
             else loop new_gen_f (gen + 1) (old_g, old_f)
   in
-  loop start_pop 1 (0,0.)
+  snd @: loop start_pop 1 (0,0.)
   
 (* options for choosing from main file *)
 let selection_opts = 
