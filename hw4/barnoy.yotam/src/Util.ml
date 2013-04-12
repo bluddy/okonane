@@ -127,10 +127,10 @@ let iterate_until f p init =
 
 (* repeat a function many times, building a list from indices *)
 (* do this without instantiating the index list *)
-let build_list_from_index f first num = 
+let list_populate f first num = 
   List.rev @: snd @: iterate 
     (fun (i, acc) -> i+1, (f i)::acc)
-    (0, [])
+    (first, [])
     num
 
 (* transform a list into a list of lists of i elements *)

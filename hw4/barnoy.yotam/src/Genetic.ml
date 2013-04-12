@@ -1,19 +1,16 @@
 open Util
 open Data
 open Tree
+open MyRandom
 
-(* initialize random generator *)
-let _ = Random.self_init ()
-
-(* carry out a random roll and compare it to a given probability *)
-let roll_f prob = Random.float 1. < prob
-
+(* shortcuts to sorting functions *)
 let sort_ascend_fn fn = List.sort (fun a b -> fn a -. fn b)
 let sort_descend fn = List.sort (fun a b -> fn b -. fn a)
 let sort_ascend_fst = sort_ascend_fn fst
 let sort_descend_fst = sort_descend_fn fst
 
-(* build random trees *)
+(* ---------- tree building functions --------- *)
+
 (* p is the chance of making a node *)
 let random_tree labels values p =
   let l_num, a_num = Array.length labels, Array.length values in
@@ -25,13 +22,15 @@ let random_tree labels values p =
       values.(attr) in
     attr, attr_vals
   in
-  loop ()
+  let tree = loop ()
+  in (None, tree)
 
 (* build all the starting members of our population *)
 let random_trees labels values pop_size p =
-  build_list_from_index (fun _ -> random_tree labels values p) 0 pop_size
+  list_populate (fun _ -> random_tree labels values p) 0 pop_size
 
-(* fitness functions ------- *)
+(* -------- fitness functions ------- *)
+
 let precision_fn tree l = 
   let prec = fst @: avg_prec_recall l in
   prec
@@ -40,7 +39,9 @@ let recall_fn tree l =
   let recall = snd @: avg_prec_recall l in
   recall
 
-let prec_recall_fn tree l = avg_prec_recall l
+let prec_recall_fn tree l = 
+  let prec, recall = avg_prec_recall l in
+  prec + recall
 
 (* evaluate the fitness for all trees on the data, and return the trees with
  * normalized fitness values *)
@@ -51,52 +52,12 @@ let eval_fitness_all fitness_fn filter_p data trees =
     | 1. -> data
     | p  -> List.filter (roll_f p) data in
   (* for each tree, classify the data and apply the fitness function *)
-  List.fold_left (fun acc tree ->
+  List.fold_left (fun acc (_,tree) ->
       let classes = list_map (fun datum -> classify tree datum) filtered_data in
       let fitness = fitness_fn tree @: list_zip labels classes in
       (Some fitness, tree)::acc
     ) 
     [] trees
-
-(* randomness functions *)
-(* select x members at random, assuming equal likelihood *)
-let select_random num pop =
-  let prob = (foi num) /. (foi pop) in
-  snd @: iterate_until   (* keep looping until we have enough *)
-    (fun (i, (take, rest)) -> 
-      foldl_until  (* loop over the population *)
-        (fun (j, (t, r)) tree ->
-          if roll_f prob
-          then (j+1, (tree::t, r))
-          else (j,   (t, tree::r))
-        )
-        (fun (j, _) -> j >= num) (* stop condition *)
-        (i, take, [])
-        rest)
-    (fun (i, _) -> i >= num)
-    (0, [], pop)
-
-(* select members from one run over the population, at uniform prob *)
-let select_random_prob prob pop =
-  snd @: List.fold_left  (* loop over the population *)
-    (fun (t, r) tree ->
-      if roll_f prob
-      then tree::t, r
-      else t, tree::r
-    )
-    ([], [])
-    pop
-
-(* select one member from a list randomly *)
-let random_select_one l = List.nth l @: Random.int @: List.length l
-
-(* choose randomly from an array *)
-let random_select_from_arr arr = arr.(Random.int @: Array.length arr)
-
-(* choose a random subset of a list *)
-let random_subset l = 
-  let len = List.length l in
-  List.fold_left (fun acc x -> if roll_f 0.5 then x::acc else acc) [] l
 
 (* Selection functions ------ *)
 (* fitness proportionate function *)
@@ -138,7 +99,7 @@ let tournament_fn p num pop =
     (fun (i, _) -> i >= num)
     (0, [], pop)
 
-(* do crossover *)
+(* ---- do crossover ----- *)
 let crossover (_,tree1) (_,tree2) = 
   let size1, size2 = tree_size tree1, tree_size tree2 in
   let pt1, pt2 = Random.int size1, Random.int size2 in
@@ -158,18 +119,22 @@ let crossover_all parents =
     []
     p
 
+(* ------- selection functions -------- *)
+
 (* replacement: throw away all parents *)
 let replacement_fn _ singles parents children = children@singles
 
+(* elitism: go by rank *)
 let elitism_fn num singles parents children =
   let adults = parents@singles in
-  let sorted = sort_ascend adults in
+  let sorted = sort_ascend_fst adults in
   let best = list_take num sorted in
   children@best
 
-(* mutation *)
-(* attrib_sets: num of values, list of attributes with that number *)
-let mutate labels values attrib_sets tree = 
+(* ------- mutation ------- *)
+
+(* attrib_sets: num of values in attrib, list of attributes with that number *)
+let mutate labels values attrib_sets (_,tree) = 
   let subset = random_subset [0;1;2] in
   let modify tree = function
     (* change a decision variable in a node *)
@@ -230,13 +195,20 @@ let mutate labels values attrib_sets tree =
         | None -> failwith "failed to delete at zipper"
         | Some z' -> zipper_top z'
   in
-  List.fold_left (fun t i -> modify t i) tree subset
+  (* carry out any subset of mutations *)
+  (* make sure to zero out the fitness which is no longer valid *)
+  List.fold_left (fun t i -> (None, modify t i)) tree subset
 
 (* mutate a chunk of the population according to a probability *)
 let mutate_all labels values attrib_sets prob pop =
   let subjects, rest = select_random_prob prob pop in
   let mutants = list_map (mutate labels values attrib_sets) mutants in
   mutants, rest
+
+(* get the best fitness tree we have *)
+let best_fitness pop = list_take 1 @: sort_descend_fst pop
+
+(* ------- main function -------- *)
 
 (* start a run of the genetic algorithm *)
 let genetic_run params data =
@@ -342,15 +314,15 @@ let default_delta = 0.01
 
 let default_params = {
     build_p = 0.3;
-    fitness_fn = Precision;
+    fitness_fn = precision_fn;
     filter_p = 1.0;
     pop_size = 1000;
-    selection = FitnessProp;
+    selection = fitprop_fn;
     tournament_size = 40;
     tournament_winners = 5;
     mutation_p = 0.01;
     crossover_p = 0.4;
-    replacement = Replacement;
+    replacement = replacement_fn;
     termination = Delta (default_delta, default_delta_gen);
 }
 
