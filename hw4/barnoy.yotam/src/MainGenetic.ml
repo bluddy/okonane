@@ -100,9 +100,9 @@ let main () =
   parse_cmd_line ();
   if !file = "" then
     (Arg.usage param_specs usage_msg; error "\nNo input files specified");
-  let d = load_data true "," !file in
-  let results = k_fold !k d (genetic_run !debug) test in
-  print_results_all results
+  let d = Data.load_data "," !file in
+  let results = Test.k_fold !k d (Genetic.genetic_run !debug) Test.test in
+  Test.print_results_all results
 
 let _ = main ()
 

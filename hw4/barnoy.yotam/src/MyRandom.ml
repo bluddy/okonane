@@ -10,7 +10,7 @@ let roll_f prob = Random.float 1. < prob
 (* randomness functions *)
 (* select x members at random, assuming equal likelihood *)
 let select_random num pop =
-  let prob = (foi num) /. (foi pop) in
+  let prob = (foi num) /. (foi @: List.length pop) in
   snd @: iterate_until   (* keep looping until we have enough *)
     (fun (i, (take, rest)) -> 
       foldl_until  (* loop over the population *)
@@ -19,11 +19,11 @@ let select_random num pop =
           then (j+1, (tree::t, r))
           else (j,   (t, tree::r))
         )
-        (fun (j, _) -> j >= num) (* stop condition *)
-        (i, take, [])
+        (fun (j, _) _ -> j >= num) (* stop condition *)
+        (i, (take, []))
         rest)
     (fun (i, _) -> i >= num)
-    (0, [], pop)
+    (0, ([], pop))
 
 (* select members from one run over the population, at uniform prob *)
 let select_random_prob prob pop =
@@ -42,7 +42,8 @@ let random_select_one l = List.nth l @: Random.int @: List.length l
 (* choose randomly from an array *)
 let random_select_from_arr arr = arr.(Random.int @: Array.length arr)
 
-(* choose a random subset of a list *)
+(* choose a random subset of a list, with 1 being minimum *)
 let random_subset l = 
-  let len = List.length l in
-  List.fold_left (fun acc x -> if roll_f 0.5 then x::acc else acc) [] l
+  let to_take = 1 + (Random.int @: (List.length l) - 1) in
+  select_random to_take l
+

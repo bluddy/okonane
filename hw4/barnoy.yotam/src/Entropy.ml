@@ -4,7 +4,7 @@ open Tree
 open Data
 
 (* convert data to a tree using entropy *)
-let tree_of_data print use_gr use_chi list_data : string tree_t =
+let tree_of_data print use_gr use_chi list_data : tree_t =
   if print then Printf.printf "Read %d entries\n" (List.length list_data);
   let len = Array.length @: snd @: list_head list_data
   in

@@ -1,20 +1,52 @@
 open Util
 open Data
 open Tree
+open Test
 open MyRandom
 
+(* type of tree with fitness data attached *)
+type fit_tree_t = float option * tree_t
+type pop_t = fit_tree_t list
+
+(* termination criteria type *)
+type termination_t = Generations of int | Delta of float * int
+
+(* function types *)
+type fitness_t = fit_tree_t -> (string * string) list -> fit_tree_t
+type replacement_t = int -> pop_t -> pop_t
+type selection_t = parameters_t -> int -> pop_t -> pop_t
+
+and parameters_t = {
+    build_p : float;       (* prob used to build initial trees *)
+    fitness_fn : fitness_t;
+    filter_p : float option; (* prob for filtering application of fitness *)
+    pop_size : int;
+    selection_fn : selection_t;
+    tournament_size : int;
+    tournament_winners : int;
+    mutation_p : float;
+    crossover_p : float;
+    replacement_fn : replacement_t;
+    termination : termination_t;
+  }
+
+
+
+
 (* shortcuts to sorting functions *)
-let sort_ascend_fn fn = List.sort (fun a b -> fn a -. fn b)
-let sort_descend fn = List.sort (fun a b -> fn b -. fn a)
+let sort_ascend_fn fn = List.sort 
+  (fun a b -> if fn a -. fn b > 0. then 1 else (-1))
+let sort_descend_fn fn = List.sort 
+  (fun a b -> if fn a -. fn b > 0. then (-1) else 1)
 let sort_ascend_fst = sort_ascend_fn fst
 let sort_descend_fst = sort_descend_fn fst
 
 (* ---------- tree building functions --------- *)
 
 (* p is the chance of making a node *)
-let random_tree labels values p =
+let random_tree labels values p : fit_tree_t =
   let l_num, a_num = Array.length labels, Array.length values in
-  let loop () : string tree_t = 
+  let rec loop () : tree_t = 
     let attr = Random.int a_num in (* random attribute *)
     let attr_vals = array_map (fun v ->
         if roll_f p then Node(v, loop ())
@@ -281,34 +313,7 @@ let replacement_opts =
 let fitness_opts =
   ["precision", precision_fn; "recall", recall_fn; "mix", prec_recall_fn]
 
-type termination_t = Generations of int | Delta of float * int
-
-(* type of tree with fitness data attached *)
-type fit_tree_t = float option * string tree_t
-
-type pop_t = fit_tree_t list
-
-(* function types *)
-type fitness_t = fit_tree_t -> (string * string) list -> fit_tree_t
-
-type replacement_t = int -> pop_t -> pop_t
-
-type selection_t = parameters_t -> int -> pop_t -> pop_t
-
-and parameters_t = {
-    build_p : float;       (* prob used to build initial trees *)
-    fitness_fn : fitness_t;
-    filter_p : float option; (* prob for filtering application of fitness *)
-    pop_size : int;
-    selection_fn : selection_t;
-    tournament_size : int;
-    tournament_winners : int;
-    mutation_p : float;
-    crossover_p : float;
-    replacement_fn : replacement_t;
-    termination : termination_t;
-  }
-
+(* default values -------- *)
 let default_delta_gen = 100
 let default_delta = 0.01
 
@@ -325,7 +330,3 @@ let default_params = {
     replacement = replacement_fn;
     termination = Delta (default_delta, default_delta_gen);
 }
-
-
-
-

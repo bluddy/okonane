@@ -4,26 +4,25 @@ open Array
 
 type datum_t = string
 type label_t = string
-type vector_t = label_t option * datum_t array
+type vector_t = label_t * datum_t array
 
 (* sum up the counts in a list *)
 let sum_counts l = List.fold_left (fun a (_, n) -> a + n) 0 l
 
-let load_data has_label sep file : vector_t list =
+let load_data sep file : vector_t list =
   let reg = Str.regexp sep in
   let lines = read_file_lines file in
   let proc l = 
     let l' = Str.split reg l in
     let ar = Array.of_list @: list_tail l' in
-    let lab = if has_label then Some (list_head l') else None in
+    let lab = list_head l' in
     lab, ar in
   List.map proc lines
 
-(* get counts for entropy. Must have labels *)
+(* get counts for entropy *)
 let get_data_counts l (index:int) =
   let do_fold map full_vec =
-    let label = match fst full_vec with | Some l -> l | None ->
-       invalid_arg "Must have labels in data" in
+    let label = fst full_vec in
     let dat = snd full_vec in
     let vec = dat.(index) in
     assoc_modify (function 
@@ -65,11 +64,10 @@ let sum_over_data_counts counts =
 let get_label_counts l =
   List.fold_left 
     (fun lab_list x ->
-      match fst x with None -> invalid_arg "Must have labels" | Some label ->
-        assoc_modify 
-          (function Some i -> i+1 | None -> 1)
-          label
-          lab_list)
+      assoc_modify 
+        (function Some i -> i+1 | None -> 1)
+        (fst x)
+        lab_list)
     [] l
 
 (* extract the labels from the data *)
