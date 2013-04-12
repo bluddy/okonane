@@ -1,7 +1,6 @@
 open Util
 open Data
 open Tree
-open Genetic
 
 let error s = prerr_endline s; exit 1
 

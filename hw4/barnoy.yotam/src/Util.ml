@@ -118,6 +118,13 @@ let iterate f init num =
     | i -> loop (f acc) (i-1)
   in loop init num
 
+(* calls f on its output over and over again until p is true *)
+let iterate_until f p init =
+  let rec loop acc = 
+    if p acc then acc
+    else loop (f acc)
+  in loop init
+
 (* repeat a function many times, building a list from indices *)
 (* do this without instantiating the index list *)
 let build_list_from_index f first num = 
@@ -209,6 +216,11 @@ let array_find_return pred arr =
 (* map an array to a list *)
 let array_map f arr = 
   List.rev @: Array.fold_left (fun acc x -> (f x)::acc) [] arr
+
+(* convert a list of lists to an array matrix for random access *)
+let matrix_of_lists l = 
+  let l' = list_map Array.of_list l in
+  Array.of_list l'
 
 (* --- String functions --- *)
 (* split a string into lines *)
