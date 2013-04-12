@@ -11,10 +11,10 @@ let k = ref 10 (* k-folding *)
 
 let param_specs = Arg.align 
     [
-        "-k", Arg.Set_int k, " Number of folds for k-folds";
-        "-g", Arg.Set use_gr, " Use gain ratio";
-        "-d", Arg.Set debug, " Show debug information";
-        "-c", Arg.Set use_chi, " Use chi-square tests";
+        "-k", Arg.Set_int k, " Number of folds for k-folds (default: 10)";
+        "-g", Arg.Set use_gr, " Use gain ratio (default: no)";
+        "-d", Arg.Set debug, " Show debug information (default: no)";
+        "-c", Arg.Set use_chi, " Use chi-square tests (default: no)";
     ]
 
 let usage_msg = ""

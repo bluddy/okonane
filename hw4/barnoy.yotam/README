@@ -1,41 +1,31 @@
-Aritificial Intelligence HW 2: Game Play
+Aritificial Intelligence HW 4: Decision Trees
 
 Yotam Barnoy
 
 Files:
 ------
-_tags         - Used by the ocamlbuild system.
-run.sh        - Runs bin/Main.native
-compile.sh    - Compiles using the ocamlbuild system.
-src/Main.ml   - The main file of the program. Interprets command line parameters 
-								and calls the main game loop.
-src/AI.ml		  - Handles all AI routines and evaluation functions.
-src/Board.ml  - Handles functionality related to the board.
-src/Game.ml   - The main routines for instantiating and managing a game.
-src/GameState.ml - Contains the data structures used by both AI and Game and 
-						    prevents circular module references.
-src/Util.ml   - Different utility functions that I've personally written. These copy some of Haskell's API functionality.
-doc/hw2.tex   - Latex file for the written part of the homework.
-doc/hw2.pdf   - PDF file
+_tags               - Used by the ocamlbuild system.
+rungen.sh           - Runs the genetic algorithm
+runent.sh           - Runs the entropy algorithm
+compile.sh          - Compiles using the ocamlbuild system.
+src/MainEnt.ml      - The main files of the program. Interprets command line parameters
+src/MainGenetics.ml   and call the main algorithms and their tests.
+src/Util.ml   			- Different utility functions that I've personally written. These copy some of Haskell's API functionality.
+src/ChiSquare.ml    - Adapted from http://rosettacode.org/wiki/Verify_distribution_uniformity/Chi-squared_test#Python
+									    I couldn't find an ocaml implementation of chi-square, so I translated a C one.
+src/Data.ml 				- Functions that deal with reading the data and performing computations on it.
+src/Entropy.ml      - The entropy-based algorithm.
+src/Genetic.ml      - The genetic algorithm.
+src/MyRandom.ml     - Functions that simplify carrying out random operations
+src/Test.ml					- Functions that have to do with testing data. Used by the genetic algorithm as well.
+src/Tree.ml					- Functions for dealing with/modifying trees, including a zipper which allows constant-time operations on functional data structures.
+data/*						  - Data files modified by hand (really by Vim), as well as joining the test and train data if there was any.
 
 To build: run compile.sh. This will invoke the ocamlbuild system.
-To run: run run.sh
-	- Silent operation is possible by invoking 'run.sh -s'. This allows for batch games with summary statistics.
+To run: run rungen.sh or runent.sh
 
-You will be prompted to choose the size of the board, which side you want to play, and which AIs you would like to use for the AI players (if any). Once the game starts, you can change AI parameters by entering 'z', or choose a piece to move by writing the coordinates of the piece ('a1' or '1a'), at which point you'll be prompted with the possible locations to which the piece can be moved (from which you choose using a number).
+Both algorithms use k-fold testing, and therefore take one file as input. Of course, the genetic algorithm has many more parameters.
+After doing k folds (by default, 10), the algorithms will present detailed statistics.
 
-The code is organized around the Game.ml module, which, as in all ocaml code, is organized bottom to top. start_game is where the game starts. It asks for input and loops over the requested number of games. To play more than 1 game, you must invoke the program with the '-s' (silent) parameter. 
-
-start_game calls the AI module's modify_ai() function to fill in any missing AI players. It receives both the constructor of the respective AI and the function for that AI. Storing the function is critical, as many functions are curried with extra information like the evaluation function before being returned to the Game module. 
-
-main_loop() is called by start_game() once everything is ready. It increases the turn counter and checks if the last player to go won. If not, it invokes the funciton of the next player. player_turn() handles player input for a player turn, while the functions in the AI module handle AI turns.
-
-Within the AI module, each AI type has its own function (ai_alpha_beta, ai_minimax, ai_random) while the time bounded AI is implemented by another function (ai_time_bounded) that can take any one of the first 3 functions. Several evaluation functions are in the file -- I went through a few of them before I settled on 2 main ones -- eval3_cheap and eval3.
-
-The Board module contains a function to initialize a board (make_default), stringification functions, functions converting between tuples and directions, functions finding orthogonal (non-overlapping) moves for the AI (moves_overlap, find_conflicts and ortho_move_sets) as well as the key functions expand, play and rewind. 
-
-Expand functions as it does in every search program. It tries to be relatively efficient rather than brute force, examining either the empty spots or the player's pieces first (whichever are fewer) and working from there. Moves are confined to the board and then iteratively extended so long as there is where to extend them to.
-
-Play and rewind do exactly that -- they play and rewind a move on the board. To avoid allocating the board array over and over, only one array is ever used, and every move that is examined is first played on top of the board and then 'rewound'. A convenience function, 'with_turn', is used in some cases to ensure that plays always have a matching rewind.
 
 

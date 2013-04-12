@@ -1,3 +1,6 @@
-#if [ ! -d "./bin" ]; then mkdir bin; fi; cd src; ocamlbuild Main.native -build-dir ../bin $@; cd ..
-if [ ! -d "./bin" ]; then mkdir bin; fi; cd src; ocamlbuild Main.byte -tag debug -build-dir ../bin $@; cd ..
+#!/bin/bash
+
+if [ ! -d "./bin" ]; then mkdir bin; fi;
+cd src; ocamlbuild MainGenetic.byte -build-dir ../bin $@; cd ..
+cd src; ocamlbuild MainEnt.byte -build-dir ../bin $@; cd ..
 
