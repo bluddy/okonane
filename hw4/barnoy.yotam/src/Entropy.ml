@@ -4,14 +4,14 @@ open Tree
 open Data
 
 (* convert data to a tree using entropy *)
-let tree_of_data print use_gr list_data : string tree_t =
+let tree_of_data print use_gr use_chi list_data : string tree_t =
   if print then Printf.printf "Read %d entries\n" (List.length list_data);
   let len = Array.length @: snd @: list_head list_data
   in
   let rec loop l attribs =
     let min_i, min_e = 
-      if use_gr then max_info_gr attribs l
-      else min_entropy attribs l in
+      if use_gr then Data.max_info_gr attribs l
+      else Data.min_entropy attribs l in
     let rem_attrib = List.filter 
       (function i when i=min_i -> false | _ -> true) attribs in
     let split = split_data l min_i in
