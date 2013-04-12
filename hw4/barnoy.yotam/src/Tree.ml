@@ -50,6 +50,13 @@ let zipper_up = function
       let new_node = Node(v,t) in
       Some(next, (attr, connect_nodes ll new_node lr))
 
+(* delete the node at the zipper *)
+let zipper_delete label = function
+  | Top -> None
+  | Path(next, attr, v, ll, lr), t -> 
+      let new_node = Leaf(v,label) in
+      Some(next, (attr, connect_nodes ll new_node lr))
+
 let zipper_down_i i = ((p, (attr, xs)) : zipper_t) =
   let l, n, r = split_nodes xs i in
   match v with 
@@ -98,54 +105,29 @@ let modify_zipper f (path,t) : zipper_t = (path, f t)
 (* get the node from a zipper *)
 let zipper_get_node (z:zipper_t) = snd z
 
-(* get a zipper for a particular node number in the tree *)
-(*let zipper_at tree i =*)
-  (*let n = ref 0 in*)
-  (*let zipper = zipper_of_tree tree*)
-  (*in*)
-  (*let rec move_down z =*)
-    (*let rec move_right z =*)
-      (*if !n >= i then Some z*)
-      (*else*)
-        (*match zipper_right z with*)
-        (*| None    -> None*)
-        (*| Some z' -> n := !n + 1;*)
-            (*match move_down z' with*)
-            (*| None -> move_right z'*)
-            (*| x    -> x*)
-    (*in*)
-    (*if !n >= i then z*)
-    (*else*)
-      (*match zipper_down z with*)
-      (*| None    -> None*)
-      (*| Some z' -> n := !n + 1;*)
-         (*move_right z'*)
-  (*in*)
-  (*let z_out = move_down z in*)
-  (*if !n <> i then invalid_arg "node "^soi i^" not found in tree"*)
-  (*else z_out*)
+(* set the node in a zipper *)
+let zipper_set_node ((p,t):zipper_t) node : zipper_t = (p,node)
 
-(* get a zipper for a particular node number in the tree *)
+(* fold over a tree using a zipper *)
 let zipper_fold_until f p init tree =
   let zipper = zipper_of_tree tree
   in
   let rec move_down acc z =
     let rec move_right a z =
-      if p a z then Some a
+      if p a z then a
       else
         let a' = f a z in
         match zipper_right z with
-        | None    -> None
+        | None    -> a'
         | Some z' -> 
-            match move_down a' z' with
-            | None -> move_right a' z'
-            | x    -> x
+            let a'' =  move_down a' z' in
+            move_right a'' z'
     in
-    if p acc z then Some acc
+    if p acc z then acc
     else
       let acc' = f acc z in
       match zipper_down z with
-      | None    -> None
+      | None    -> acc'
       | Some z' -> move_right acc' z'
   in
   move_down init @: zipper_of_tree tree
@@ -154,7 +136,7 @@ let zipper_fold f init tree =
   zipper_fold_until f (fun _ -> None) init tree
 
 (* get a zipper at a location in the tree *)
-let zipper_at tree i =
+let zipper_at tree i : zipper_t =
   let n = ref 0 in
   zipper_fold_until
     (fun _ _ -> n := !n + 1)
@@ -246,8 +228,6 @@ let tree_of_data ?(print=false) use_gr list_data : string tree_t =
   let r = create_range 0 len in
   loop list_data r
 
-(* fold over a tree *)
-let tree_fold f init (tree:'a tree_t) =
   let rec loop t a =
     let a' = f a t in
     List.fold_left (fun acc -> function
@@ -272,11 +252,25 @@ let tree_fold_until f p init (tree:'a tree_t) =
         snd t
   in loop tree init
 
+(* fold over a tree *)
+let tree_fold f init (tree:'a tree_t) =
+  tree_fold_until f (fun _ _ -> false) init tree
+
 (* get the number of attribute nodes of a tree *)
-let tree_size tree =
+let size_of_tree tree =
   let num = ref 0 in
   tree_fold (fun _ _ -> num := !num + 1) 0 tree
 
+(* get the node numbers that have leaves *)
+let tree_nodes_with_leaves tree = 
+  let num = ref 0 in
+  tree_fold (fun acc (_,nlist) ->
+      let oldnum = !num in 
+      num := !num + 1;
+      if List.exists (function Leaf _ -> true | _ -> false) nlist
+      then oldnum::acc else acc)
+    [] tree
+  
 (* get the path and node of a certain position in the tree *)
 let tree_get_path_and_node tree i =
   let num = ref 0 in

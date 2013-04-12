@@ -8,49 +8,6 @@ let _ = Random.self_init ()
 (* carry out a random roll and compare it to a given probability *)
 let roll_f prob = Random.float 1. < prob
 
-(* options for choosing from main file *)
-let selection_opts = 
-  ["fitprop", fitprop_fn; "rank", rank_fn; "tournament", tournament_fn]
-
-let replacement_opts = 
-  ["elitism", elitism_fn; "replacement", replacement_fn]
-
-let fitness_opts =
-  ["precision", precision_fn; "recall", recall_fn; "mix", prec_recall_fn]
-
-type termination_t = Generations of int | Delta of float * int
-
-type parameters_t = {
-    build_p : float;       (* prob used to build initial trees *)
-    fitness_fn : fitness_t;
-    filter_p : float option; (* prob for filtering application of fitness *)
-    pop_size : int;
-    selection_fn : selection_t;
-    tournament_size : int;
-    tournament_winners : int;
-    mutation_p : float;
-    crossover_p : float;
-    replacement_fn : replacement_t;
-    termination : termination_t;
-  }
-
-let default_delta_gen = 100
-let default_delta = 0.01
-
-let default_params = {
-    build_p = 0.3;
-    fitness_fn = Precision;
-    filter_p = 1.0;
-    pop_size = 1000;
-    selection = FitnessProp;
-    tournament_size = 40;
-    tournament_winners = 5;
-    mutation_p = 0.01;
-    crossover_p = 0.4;
-    replacement = Replacement;
-    termination = Delta (default_delta, default_delta_gen);
-}
-
 let sort_ascend_fn fn = List.sort (fun a b -> fn a -. fn b)
 let sort_descend fn = List.sort (fun a b -> fn b -. fn a)
 let sort_ascend_fst = sort_ascend_fn fst
@@ -74,6 +31,17 @@ let random_tree labels values p =
 let random_trees labels values pop_size p =
   build_list_from_index (fun _ -> random_tree labels values p) 0 pop_size
 
+(* fitness functions ------- *)
+let precision_fn tree l = 
+  let prec = fst @: avg_prec_recall l in
+  prec
+
+let recall_fn tree l =
+  let recall = snd @: avg_prec_recall l in
+  recall
+
+let prec_recall_fn tree l = avg_prec_recall l
+
 (* evaluate the fitness for all trees on the data, and return the trees with
  * normalized fitness values *)
 let eval_fitness_all fitness_fn filter_p data trees =
@@ -84,57 +52,13 @@ let eval_fitness_all fitness_fn filter_p data trees =
     | p  -> List.filter (roll_f p) data in
   (* for each tree, classify the data and apply the fitness function *)
   List.fold_left (fun acc tree ->
-      let classes = list_map (fun datum -> classify tree datum) data in
+      let classes = list_map (fun datum -> classify tree datum) filtered_data in
       let fitness = fitness_fn tree @: list_zip labels classes in
       (Some fitness, tree)::acc
     ) 
     [] trees
 
-(* normalize the fitness *)
-(*let normalize_fitness trees = *)
-  (*List.fold_left *)
-    (*(fun acc (f, t) -> (f /. total_fitness, t)::acc)*)
-    (*[] trees*)
-
-(* Selection functions ------ *)
-(* fitness proportionate function *)
-let fitprop_fn num pop =
-  let total_fitness = 
-    List.fold_left (fun acc (fit, _) -> acc + fit) 0. pop in
-  let rec loop i taken rest = 
-    let i', taken', rest' = 
-      foldl_until 
-        (fun (j, t, r) ((fit, _) as tree) ->
-          if roll_f @: fit /. total_fitness 
-          then (j+1, tree::t, r)
-          else (j, t, tree::r))
-        (fun (j, _, _) -> j >= num) (* stop condition *)
-        (i, taken, [])
-        rest in
-    if i' >= num then taken', rest' (* we have as many as we need *)
-    else loop i' taken' rest' (* do another run *)
-  in
-  loop 0 [] pop
-
-(* Selection functions ------ *)
-(* fitness proportionate function *)
-let fitprop_fn num pop =
-  let total_fitness = 
-    List.fold_left (fun acc (fit, _) -> acc + fit) 0. pop in
-  snd @: iterate_until   (* keep looping until we have enough *)
-    (fun (i, (take, rest)) -> 
-      foldl_until  (* loop over the population *)
-        (fun (j, (t, r)) ((fit, _) as tree) ->
-          if roll_f @: fit /. total_fitness 
-          then (j+1, (tree::t, r))
-          else (j, (t, tree::r))
-        )
-        (fun (j, _) -> j >= num) (* stop condition *)
-        (i, take, [])
-        rest)
-    (fun (i, _) -> i >= num)
-    (0, [], pop)
-
+(* randomness functions *)
 (* select x members at random, assuming equal likelihood *)
 let select_random num pop =
   let prob = (foi num) /. (foi pop) in
@@ -165,14 +89,43 @@ let select_random_prob prob pop =
 
 (* select one member from a list randomly *)
 let random_select_one l = List.nth l @: Random.int @: List.length l
-    
+
+(* choose randomly from an array *)
+let random_select_from_arr arr = arr.(Random.int @: Array.length arr)
+
+(* choose a random subset of a list *)
+let random_subset l = 
+  let len = List.length l in
+  List.fold_left (fun acc x -> if roll_f 0.5 then x::acc else acc) [] l
+
+(* Selection functions ------ *)
+(* fitness proportionate function *)
+let fitprop_fn _ num pop =
+  let total_fitness = 
+    List.fold_left (fun acc (fit, _) -> acc + fit) 0. pop in
+  let rec loop i taken rest = 
+    let i', taken', rest' = 
+      foldl_until 
+        (fun (j, t, r) ((fit, _) as tree) ->
+          if roll_f @: fit /. total_fitness 
+          then (j+1, tree::t, r)
+          else (j, t, tree::r))
+        (fun (j, _, _) -> j >= num) (* stop condition *)
+        (i, taken, [])
+        rest in
+    if i' >= num then taken', rest' (* we have as many as we need *)
+    else loop i' taken' rest' (* do another run *)
+  in
+  loop 0 [] pop
+
 (* rank-based: just take the top num members *)
-let rank_fn num pop =
+let rank_fn _ num pop =
   let sorted = sort_descend_fst pop in
   list_take num sorted, list_drop num sorted
 
 (* tournament: take a certain number of members, then take the best ones *)
-let tournament_fn tourn_size win_num num pop =
+let tournament_fn p num pop =
+  let tourn_size, win_num = p.tournament_size, p.tournament_winners in
   iterate_until
     (fun (i, (take, leave)) ->
       let tourn, rest = select_random tourn_size leave in
@@ -186,14 +139,14 @@ let tournament_fn tourn_size win_num num pop =
     (0, [], pop)
 
 (* do crossover *)
-let crossover tree1 tree2 = 
+let crossover (_,tree1) (_,tree2) = 
   let size1, size2 = tree_size tree1, tree_size tree2 in
   let pt1, pt2 = Random.int size1, Random.int size2 in
-  let path1, node1 = tree_get_path_and_node tree1 pt1 in
-  let path2, node2 = tree_get_path_and_node tree2 pt2 in
-  let tree1' = tree_replace_node tree1 node1 path1 in
-  let tree2' = tree_replace_node tree2 node2 path2 in
-  tree1', tree2'
+  let z1, z2 = zipper_at tree1 pt1, zipper_at tree2 pt2 in
+  let n1, n2 = zipper_get_node z1, zipper_get_node z2 in
+  let z1', z2' = zipper_set_node z1 n2, zipper_set_node z2 n1 in
+  let t1', t2' = zipper_top z1', zipper_top z2' in
+  (None, t1'), (None, t2') (* fitness is invalid *)
 
 let crossover_all parents =
   let len = List.length parents / 2 in
@@ -216,45 +169,74 @@ let elitism_fn num singles parents children =
 
 (* mutation *)
 (* attrib_sets: num of values, list of attributes with that number *)
-let mutate values attrib_sets tree = 
-  match Random.int 3 with
-  (* change a decision variable in a node *)
-  (* we can only change to another variable of equal arity *)
-  | 0 -> let size = tree_size tree in
-    (* the legal attributes to switch *)
-    let pos_attribs = List.flatten attrib_sets in
-    let tree_attribs = attribs_of_tree tree in
-    let tree_attribs' = 
-      List.filter (fun (_,attr) -> List.mem attr pos_attribs) attribs in
-    let node_num, attr = random_select_one tree_attribs' in
-    let set = List.find (fun set -> List.mem attr set) attrib_sets in
-    let other_attr = random_select_one @: list_remove attr set in
-    let z = zipper_at tree node_num in
-    let z' = modify_zipper 
-      (fun (a, nlist) -> 
-        if a <> attr then failwith @: 
-          "attribute "^soi a^" doesn't match expected attribute "^soi attr
-        else
-          let v = values.(other_attr) in
-          let nlist' = insert_idx_fst nlist in
-          let new_nlist = list_map (function 
-              | i, Leaf (_, label) -> Leaf(v.(i), label)
-              | i, Node (_, tree)  -> Node(v.(i), tree))
-            nlist' in
-          (other_attr, new_nlist))
-      z' in
-    zipper_top z' (* get the modified tree back *)
-  (* add a node *)
-  | 1
-  (* delete a node *)
-  | 2
+let mutate labels values attrib_sets tree = 
+  let subset = random_subset [0;1;2] in
+  let modify tree = function
+    (* change a decision variable in a node *)
+    (* we can only change to another variable of equal arity *)
+    | 0 -> let size = tree_size tree in
+      (* the legal attributes to switch *)
+      let pos_attribs = List.flatten attrib_sets in
+      let tree_attribs = attribs_of_tree tree in
+      let tree_attribs' = 
+        List.filter (fun (_,attr) -> List.mem attr pos_attribs) attribs in
+      let node_num, attr = random_select_one tree_attribs' in
+      let set = List.find (fun set -> List.mem attr set) attrib_sets in
+      let other_attr = random_select_one @: list_remove attr set in
+      let z = zipper_at tree node_num in
+      let z' = modify_zipper 
+        (fun (a, nlist) -> 
+          if a <> attr then failwith @: 
+            "attribute "^soi a^" doesn't match expected attribute "^soi attr
+          else
+            let v = values.(other_attr) in
+            let nlist' = insert_idx_fst nlist in
+            let new_nlist = list_map (function 
+                | i, Leaf (_, label) -> Leaf(v.(i), label)
+                | i, Node (_, tree)  -> Node(v.(i), tree))
+              nlist' in
+            (other_attr, new_nlist))
+        z' in
+      zipper_top z' (* get the modified tree back *)
+    (* add a node *)
+    | 1 -> let nodes_leaves = tree_nodes_with_leaves tree in
+      let chosen_node = random_select_one nodes_leaves in
+      let z = zipper_at tree chosen_node in
+      let z' = modify_zipper (fun (a, nlist) ->
+          let leaves = List.fold_left (fun acc -> function 
+            | Leaf _ -> acc+1 | _ -> acc) 0 nlist in
+          let choice = Random.int leaves in
+          let newlist = List.fold_right
+            (fun node (i,acc) ->
+              if i = choice 
+              then let new_node = match node with
+                    | Leaf(s, _) -> Node(s, random_tree labels values 0.)
+                    | Node _ -> failwith "error" in
+                  (i+1, new_node::acc)
+              else (i+1, node::acc))
+            (0,[]) nlist in
+          (a, nlist))
+        z in
+      zipper_top z'
+    (* delete a node *)
+    | _ -> let tree_size = size_of_tree tree in
+      if tree_size = 1 then tree (* can't delete any more *)
+      else 
+        (* choose any node but the first *)
+        let choice = 1 + Random.int (tree_size-1) in
+        let z = zipper_at tree choice in
+        let chosen_label = random_select_from_arr labels in
+        match zipper_delete chosen_label z with
+        | None -> failwith "failed to delete at zipper"
+        | Some z' -> zipper_top z'
+  in
+  List.fold_left (fun t i -> modify t i) tree subset
 
-
-
-let mutate_all prob pop =
-  let mutants, rest = select_random_prob prob pop in
-  
-
+(* mutate a chunk of the population according to a probability *)
+let mutate_all labels values attrib_sets prob pop =
+  let subjects, rest = select_random_prob prob pop in
+  let mutants = list_map (mutate labels values attrib_sets) mutants in
+  mutants, rest
 
 (* start a run of the genetic algorithm *)
 let genetic_run params data =
@@ -265,7 +247,7 @@ let genetic_run params data =
     if n mod 2 = 1 then n-1 else n in
   let breed_num = p.pop_size - keep_num in
   (* curry a shortcut *)
-  let add_fitness = eval_fitness p.fitness_fn p.filter_p data in
+  let add_fitness = eval_fitness_all p.fitness_fn p.filter_p data in
 
   (* make arrays for fast random access *)
   let labels = Array.of_list @: uniq_labels data in
@@ -285,9 +267,10 @@ let genetic_run params data =
     (* keep only the sets that have more than 1 member *)
     let sets = List.filter (fun (_,l) -> List.length > 1) in
     list_map snd sets
+  in
     
   (* populate our initial crop with random trees *)
-  let start_pop = add_fitness @: random_trees labels values p.pop_size in
+  let start_pop = add_fitness @: random_trees labels values p.pop_size
   in
   let loop pop gen old_fitness =
     (* get a group of trees that'll make it to the next round *)
@@ -296,8 +279,9 @@ let genetic_run params data =
     let parents, _ = p.selection_fn breed_num rest in
     let children = crossover parents in
     let new_gen = p.replacement_fn selected_pop parents children in
-    let mutated, rest = mutate_all values attrib_sets p.mutation_p new_gen in
-    let new_gen_f = add_fitness mutated in
+    let mutated, rest = 
+      mutate_all labels values attrib_sets p.mutation_p new_gen in
+    let new_gen_f = add_fitness (mutated@rest) in
     (* do different things depending on our termination criterion *)
     match p.termination, old_fitness with
       | Generations(g), _ when gen >= g  -> best_fitness new_gen_f
@@ -315,6 +299,61 @@ let genetic_run params data =
   in
   loop start_pop 1 (0,0.)
   
+(* options for choosing from main file *)
+let selection_opts = 
+  ["fitprop", fitprop_fn; "rank", rank_fn; "tournament", tournament_fn]
+
+let replacement_opts = 
+  ["elitism", elitism_fn; "replacement", replacement_fn]
+
+let fitness_opts =
+  ["precision", precision_fn; "recall", recall_fn; "mix", prec_recall_fn]
+
+type termination_t = Generations of int | Delta of float * int
+
+(* type of tree with fitness data attached *)
+type fit_tree_t = float option * string tree_t
+
+type pop_t = fit_tree_t list
+
+(* function types *)
+type fitness_t = fit_tree_t -> (string * string) list -> fit_tree_t
+
+type replacement_t = int -> pop_t -> pop_t
+
+type selection_t = parameters_t -> int -> pop_t -> pop_t
+
+and parameters_t = {
+    build_p : float;       (* prob used to build initial trees *)
+    fitness_fn : fitness_t;
+    filter_p : float option; (* prob for filtering application of fitness *)
+    pop_size : int;
+    selection_fn : selection_t;
+    tournament_size : int;
+    tournament_winners : int;
+    mutation_p : float;
+    crossover_p : float;
+    replacement_fn : replacement_t;
+    termination : termination_t;
+  }
+
+let default_delta_gen = 100
+let default_delta = 0.01
+
+let default_params = {
+    build_p = 0.3;
+    fitness_fn = Precision;
+    filter_p = 1.0;
+    pop_size = 1000;
+    selection = FitnessProp;
+    tournament_size = 40;
+    tournament_winners = 5;
+    mutation_p = 0.01;
+    crossover_p = 0.4;
+    replacement = Replacement;
+    termination = Delta (default_delta, default_delta_gen);
+}
+
 
 
 
