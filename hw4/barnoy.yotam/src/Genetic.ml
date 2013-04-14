@@ -4,6 +4,8 @@ open Tree
 open Test
 open MyRandom
 
+let debug = ref false
+
 (* type of tree with fitness data attached *)
 type fit_tree_t = float option * tree_t
 type pop_t = fit_tree_t list
@@ -48,20 +50,24 @@ let sort_descend_fst l =
 (* p is the chance of making a node *)
 let random_tree labels values p : fit_tree_t =
   let l_num, a_num = Array.length labels, Array.length values in
-  let rec loop () : tree_t = 
+  let rec loop value = 
     let attr = Random.int a_num in (* random attribute *)
     let attr_vals = array_map (fun v ->
-        if roll_f p then Node(v, loop ())
+        if roll_f p then loop v
         else Leaf(v, labels.(Random.int l_num)))
       values.(attr) in
-    attr, attr_vals
+    Node(value, (attr, attr_vals))
   in
-  let tree = loop ()
-  in (None, tree)
+  let tree = match loop "" with Node(_,t) -> t | _ -> failwith "error" in
+  None, tree
 
 (* build all the starting members of our population *)
 let random_trees labels values pop_size p : fit_tree_t list =
-  list_populate (fun _ -> random_tree labels values p) 0 pop_size
+  let ts = list_populate (fun _ -> random_tree labels values p) 0 pop_size in
+  if !debug then (print_endline "Generating random trees with sizes:";
+    List.iter (fun (_,t) -> Printf.printf " %d" (size_of_tree t)) ts;
+    print_newline ());
+  ts
 
 (* -------- fitness functions ------- *)
 
@@ -151,7 +157,9 @@ let tournament_fn p num pop =
 (* ---- do crossover ----- *)
 let crossover (_,tree1) (_,tree2) = 
   let size1, size2 = size_of_tree tree1, size_of_tree tree2 in
+  Printf.printf "size1: %d, size2: %d\n" size1 size2;
   let pt1, pt2 = Random.int size1, Random.int size2 in
+  Printf.printf "pt1: %d, pt2: %d\n" pt1 pt2;
   let z1, z2 = zipper_at tree1 pt1, zipper_at tree2 pt2 in
   let n1, n2 = zipper_get_node z1, zipper_get_node z2 in
   let z1', z2' = zipper_set_node z1 n2, zipper_set_node z2 n1 in

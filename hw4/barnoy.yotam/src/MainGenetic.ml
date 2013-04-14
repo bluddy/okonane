@@ -5,7 +5,6 @@ open Genetic
 
 let error s = prerr_endline s; exit 1
 
-let debug = ref false
 let file = ref ""
 let k = ref 10 (* k-folding *)
 let params = ref default_params
@@ -67,7 +66,7 @@ let set_delta_gen i = set_optv i @: fun p x ->
 let param_specs = Arg.align 
     [
         "-k", Arg.Set_int k, " Number of folds for k-folds (default: 10)";
-        "-d", Arg.Set  debug, " Show debug information";
+        "-d", Arg.Set  Genetic.debug, " Show debug information";
         "-t", Arg.Set print_tree, " Print the tree(s)";
         "--size", Arg.Int set_pop_size, " Population Size (default: 1000) ";
         "--pbuild", Arg.Float set_build_p, " Initial tree building probability (default: 0.3)";
@@ -102,7 +101,7 @@ let main () =
   if !file = "" then
     (Arg.usage param_specs usage_msg; error "\nNo input files specified");
   let d = Data.load_data "," !file in
-  let results = Test.k_fold !k d (Genetic.genetic_run !debug !params) Test.test in
+  let results = Test.k_fold !k d (Genetic.genetic_run !Genetic.debug !params) Test.test in
   Test.print_results_all !print_tree results
 
 let _ = main ()
