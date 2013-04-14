@@ -91,6 +91,9 @@ let zipper_get_node (z:zipper_t) = snd z
 (* set the node in a zipper *)
 let zipper_set_node ((p,t):zipper_t) node : zipper_t = (p,node)
 
+(* get tree from zipper *)
+let tree_of_zipper = zipper_get_node |- zipper_top
+
 (* fold over a tree using a zipper *)
 let zipper_fold_until f p init tree =
   let rec move_down acc z =
@@ -121,9 +124,9 @@ let zipper_at tree i : zipper_t =
   let n = ref 0 in
   let z = zipper_fold_until
       (fun _ z -> n := !n + 1; Some z)
-      (fun _ _ -> n >= i)
+      (fun _ _ -> !n >= i)
       None tree in
-  match z with None -> invalid_arg @: "node "^soi !i^" not found in tree"
+  match z with None -> invalid_arg @: "node "^soi i^" not found in tree"
    | Some z' -> z'
    
 (* stringification functions *)

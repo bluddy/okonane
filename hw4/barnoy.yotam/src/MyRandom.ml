@@ -27,7 +27,7 @@ let select_random num pop =
 
 (* select members from one run over the population, at uniform prob *)
 let select_random_prob prob pop =
-  snd @: List.fold_left  (* loop over the population *)
+  List.fold_left  (* loop over the population *)
     (fun (t, r) tree ->
       if roll_f prob
       then tree::t, r
@@ -45,5 +45,5 @@ let random_select_from_arr arr = arr.(Random.int @: Array.length arr)
 (* choose a random subset of a list, with 1 being minimum *)
 let random_subset l = 
   let to_take = 1 + (Random.int @: (List.length l) - 1) in
-  select_random to_take l
+  fst @: select_random to_take l
 

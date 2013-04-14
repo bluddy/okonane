@@ -75,11 +75,15 @@ let confusion_matrix (l:(label_t * label_t) list) =
 let print_conf_matrix (labels, matrix) =
   (* shorten labels to fit as necessary *)
   let labels' = List.map (string_take 9) labels in
+  Printf.printf "%10s" " ";
   List.iter (fun l -> Printf.printf "%10s" l) labels';
+  print_newline ();
+  Printf.printf "%10s" " ";
+  List.iter (fun _ -> Printf.printf "----------") labels'; 
   print_newline ();
   let numbered = insert_idx_fst 0 labels' in
   List.iter (fun (i, label) ->
-      Printf.printf "%10s" label;
+      Printf.printf "%10s" @: label^" |";
       List.iter (fun (j, _) ->
           Printf.printf "%10d" !(matrix.(i).(j)))
         numbered;
@@ -120,8 +124,7 @@ let print_results (acc, prec, recall, _) =
 
 (* prints the output of a k-fold *)
 let print_results_all rs =
-  print_endline "Results:\n\
-                 ----------------------------";
+  print_endline "Results:\n";
   let rs' = insert_idx_fst 1 rs in
   List.iter (fun (i,(((_,_,_,tm) as train), ((_,_,_,em) as test))) -> 
       Printf.printf "Fold %i: ----------------------------- \n" i  ;

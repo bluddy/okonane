@@ -39,16 +39,16 @@ let get_data_counts l (index:int) =
   List.fold_left do_fold [] l
 
 (* get unique values for an attribute *)
-let uniq_values l (index:int) = 
-  List.fold_left (fun acc vec -> 
+let uniq_values (l:vector_t list) (index:int) = 
+  List.fold_left (fun acc (_,vec) -> 
       let v = vec.(index) in
-      if List.exists ((=) v) acc 
+      if List.mem v acc 
       then acc else v::acc)
     [] l
 
 (* get all unique values for all attributes *)
-let all_uniq_values l =
-  let vec = list_head l in
+let all_uniq_values (l:vector_t list) =
+  let (_, vec) = list_head l in
   let len = Array.length vec in
   let r = create_range 0 len in
   list_map (uniq_values l) r 

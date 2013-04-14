@@ -2,7 +2,6 @@ open Util
 open Data
 open Test
 open Genetic
-open MainCommon
 
 let error s = prerr_endline s; exit 1
 
@@ -13,13 +12,13 @@ let params = ref default_params
 
 (* gets the option of any option with an assoc list *)
 let get_opt opts s = 
-  try Some(List.assoc s)
+  try Some(List.assoc s opts)
   with Not_found -> None
 
 (* sets an option of a list *)
 let set_optl opts s fn =
   match get_opt opts s with
-   | None -> print_endline @: s^" option not found"
+   | None   -> failwith @: s^" option is unrecognized"
    | Some x -> params := fn !params x
 
 (* sets an option for a value *)
@@ -41,7 +40,7 @@ let set_selection_fn s = set_optl selection_opts s @:
 let set_t_size i = set_optv i @: fun p x -> 
   {p with tournament_size = x}
 
-let set_t_winners i = set_optv i @: fun p x -> 
+let set_t_win i = set_optv i @: fun p x -> 
   {p with tournament_winners = x}
 
 let set_mutation_p f = set_optv f @: fun p x -> {p with mutation_p = x}
@@ -49,7 +48,7 @@ let set_mutation_p f = set_optv f @: fun p x -> {p with mutation_p = x}
 let set_crossover_p f = set_optv f @: fun p x -> {p with crossover_p = x}
 
 let set_replacement_fn s = set_optl replacement_opts s @:
-  fun p x -> {p with replacement_fn = x}
+  fun p (x:replacement_t) -> {p with replacement_fun = x}
 
 let set_generations i = set_optv i @: fun p x ->
   {p with termination = Generations x}
@@ -101,7 +100,7 @@ let main () =
   if !file = "" then
     (Arg.usage param_specs usage_msg; error "\nNo input files specified");
   let d = Data.load_data "," !file in
-  let results = Test.k_fold !k d (Genetic.genetic_run !debug) Test.test in
+  let results = Test.k_fold !k d (Genetic.genetic_run !debug !params) Test.test in
   Test.print_results_all results
 
 let _ = main ()
