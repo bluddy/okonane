@@ -92,7 +92,9 @@ let print_conf_matrix (labels, matrix) =
 
 (* do k-fold cross validation *)
 let k_fold k data train_fn test_fn =
-  let size = (List.length data) / k in
+  let len = List.length data in
+  let size = len / k in
+  Printf.printf "len = %i, size = %i, k = %i\n" len size k;
   let rec loop i before fold after results =
     match fold with 
     | [] -> results
@@ -104,8 +106,12 @@ let k_fold k data train_fn test_fn =
       let res1 = test_fn tree train_data in
       print_endline "testing on test data... ";
       let res2 = test_fn tree fold in
-      loop (i+1) (before@fold) (list_take size after) 
-        (list_drop size after) ((res1,res2)::results) in
+      (* take care of small last fold *)
+      let next_size = 
+          let s = List.length after in
+          if s - size < size then s else size in
+      loop (i+1) (before@fold) (list_take next_size after) 
+        (list_drop next_size after) ((res1,res2)::results) in
   List.rev @: loop 1 [] (list_take size data) (list_drop size data) []
 
 (* run a single test of the data *)
