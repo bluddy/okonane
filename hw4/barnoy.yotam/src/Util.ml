@@ -111,6 +111,10 @@ let insert_idx_snd first xs =
 (* tail recursive, so more efficient than mapping alone *)
 let list_map f l = List.rev @: List.rev_map f l
 
+(* get an index with every item in a map *)
+let list_mapi f l = List.rev @: snd @: List.fold_left
+  (fun (i,acc) x -> i+1, (f (i,x))::acc) (0,[]) l
+
 (* calls f on its output over and over, num times *)
 let iterate f init num = 
   let rec loop acc = function
@@ -127,10 +131,10 @@ let iterate_until f p init =
 
 (* repeat a function many times, building a list from indices *)
 (* do this without instantiating the index list *)
-let list_populate f first num = 
+let list_populate f init num = 
   List.rev @: snd @: iterate 
     (fun (i, acc) -> i+1, (f i)::acc)
-    (first, [])
+    (init, [])
     num
 
 (* transform a list into a list of lists of i elements *)
@@ -249,9 +253,12 @@ let maybe def f = function
   | None -> def
   | Some x -> f x
 
-(* efficient function to get unique entities *)
-let nub xs =
+(* efficient way to get unique values from a function on a list *)
+let nubf fn xs =
     let blank = Hashtbl.create (List.length xs) in
-    List.iter (fun x -> Hashtbl.replace blank x ()) xs;
+    List.iter (fun x -> Hashtbl.replace blank (fn x) ()) xs;
     Hashtbl.fold (fun h () t -> h :: t) blank []
+
+(* efficient function to get unique entities *)
+let nub xs = nubf id_fn xs
 
