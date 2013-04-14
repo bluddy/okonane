@@ -217,6 +217,16 @@ let array_find_return pred arr =
 let array_map f arr = 
   List.rev @: Array.fold_left (fun acc x -> (f x)::acc) [] arr
 
+(* make a 2 dimensional array *)
+(* init func allows for refs *)
+let create_2d_array dimx dimy init_f =
+  let rx = create_range 0 dimx in
+  let ry = create_range 0 dimy in
+  let l = list_map (fun _ ->
+    let l' = list_map (fun _ -> init_f ()) rx in
+    Array.of_list l') ry in
+  Array.of_list l
+
 (* convert a list of lists to an array matrix for random access *)
 let matrix_of_lists l = 
   let l' = list_map Array.of_list l in

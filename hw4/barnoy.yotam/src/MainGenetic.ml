@@ -9,6 +9,7 @@ let debug = ref false
 let file = ref ""
 let k = ref 10 (* k-folding *)
 let params = ref default_params
+let print_tree = ref false
 
 (* gets the option of any option with an assoc list *)
 let get_opt opts s = 
@@ -67,6 +68,7 @@ let param_specs = Arg.align
     [
         "-k", Arg.Set_int k, " Number of folds for k-folds (default: 10)";
         "-d", Arg.Set  debug, " Show debug information";
+        "-t", Arg.Set print_tree, " Print the tree(s)";
         "-size", Arg.Int set_pop_size, " Population Size (default: 1000) ";
         "-pbuild", Arg.Float set_build_p, " Initial tree building probability (default: 0.3)";
         "-fit", Arg.String set_fitness_fn, " Fitness function (default: precision)";
@@ -101,7 +103,7 @@ let main () =
     (Arg.usage param_specs usage_msg; error "\nNo input files specified");
   let d = Data.load_data "," !file in
   let results = Test.k_fold !k d (Genetic.genetic_run !debug !params) Test.test in
-  Test.print_results_all results
+  Test.print_results_all !print_tree results
 
 let _ = main ()
 

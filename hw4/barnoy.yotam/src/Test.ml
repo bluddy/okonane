@@ -9,11 +9,14 @@ let classify tree vector =
   let vec = snd vector in (* ignore label *)
   let rec loop (attrib, val_l) =
     let v = vec.(attrib) in
-    let m = List.find (function
+    let m = try List.find (function
         | Node(x, _) when x = v -> true
         | Leaf(x, _) when x = v -> true
         | _ -> false) 
-      val_l in
+      val_l 
+          with (* if we can't find the value, just take the first choice *)
+             Not_found -> list_head val_l
+      in
     match m with
      | Leaf (_, label)   -> label
      | Node (_, subtree) -> loop subtree
@@ -65,7 +68,7 @@ let confusion_matrix (l:(label_t * label_t) list) =
   let uniq_labels = nub all_labels in
   let num = List.length uniq_labels in
   let labels = insert_idx_snd 0 uniq_labels in
-  let arr = Array.make_matrix num num (ref 0) in
+  let arr = create_2d_array num num (fun _ -> ref 0) in
   List.iter (fun (label, out) ->
     let p = arr.(List.assoc out labels).(List.assoc label labels) in
     p := !p + 1) l;
@@ -74,7 +77,7 @@ let confusion_matrix (l:(label_t * label_t) list) =
 (* print out the confusion matrix *)
 let print_conf_matrix (labels, matrix) =
   (* shorten labels to fit as necessary *)
-  let labels' = List.map (string_take 9) labels in
+  let labels' = List.map (string_take 8) labels in
   Printf.printf "%10s" " ";
   List.iter (fun l -> Printf.printf "%10s" l) labels';
   print_newline ();
@@ -111,7 +114,7 @@ let k_fold k data train_fn test_fn =
           let s = List.length after in
           if s - size < size then s else size in
       loop (i+1) (before@fold) (list_take next_size after) 
-        (list_drop next_size after) ((res1,res2)::results) in
+        (list_drop next_size after) ((tree,res1,res2)::results) in
   List.rev @: loop 1 [] (list_take size data) (list_drop size data) []
 
 (* run a single test of the data *)
@@ -129,10 +132,10 @@ let print_results (acc, prec, recall, _) =
   Printf.printf "Acc:%5f, Prec:%5f, Recal:%5f" acc prec recall
 
 (* prints the output of a k-fold *)
-let print_results_all rs =
+let print_results_all print_tree rs =
   print_endline "Results:\n";
   let rs' = insert_idx_fst 1 rs in
-  List.iter (fun (i,(((_,_,_,tm) as train), ((_,_,_,em) as test))) -> 
+  List.iter (fun (i,(tree, ((_,_,_,tm) as train), ((_,_,_,em) as test))) -> 
       Printf.printf "Fold %i: ----------------------------- \n" i  ;
       print_string "Train data: ";
       print_results train;
@@ -141,6 +144,8 @@ let print_results_all rs =
       print_results test;
       print_string "\n\n";
       print_conf_matrix em; (* only print conf matrix for test data *)
+      print_newline ();
+      if (print_tree) then print_endline @: string_of_tree tree;
       print_newline ();
     ) rs'
 
