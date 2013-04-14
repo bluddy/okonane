@@ -68,6 +68,13 @@ let list_remove r l =
 
 let compose_fn f g x = f(g x)
 
+(* function that folds until a predicate is true, which point the output is
+ * finalized. The fin function takes the remaining list *)
+let rec foldl_until_fin f p fin acc = function
+    | ((x::_) as l) when p acc x -> fin acc l
+    | x::xs -> foldl_until_fin f p fin (f acc x) xs 
+    | []    -> fin acc [] 
+
 (* function that folds until a predicate is true *)
 let rec foldl_until f p acc = function
     | x::_ when p acc x -> acc 

@@ -39,19 +39,14 @@ let get_data_counts l (index:int) =
   List.fold_left do_fold [] l
 
 (* get unique values for an attribute *)
-let uniq_values (l:vector_t list) (index:int) = 
-  List.fold_left (fun acc (_,vec) -> 
-      let v = vec.(index) in
-      if List.mem v acc 
-      then acc else v::acc)
-    [] l
+let uniq_values (l:vector_t list) index = 
+  nubf (fun (_,vec) -> vec.(index)) l
 
 (* get all unique values for all attributes *)
 let all_uniq_values (l:vector_t list) =
   let (_, vec) = list_head l in
   let len = Array.length vec in
-  let r = create_range 0 len in
-  list_map (uniq_values l) r 
+  list_populate (uniq_values l) 0 len
 
 (* sum over labels *)
 let sum_over_data_counts counts =
@@ -71,7 +66,7 @@ let get_label_counts l =
     [] l
 
 (* extract the labels from the data *)
-let uniq_labels l = fst @: List.split @: get_label_counts l
+let uniq_labels l = nubf fst l
 
 (* split data according to the values of an attribute *)
 let split_data l index =

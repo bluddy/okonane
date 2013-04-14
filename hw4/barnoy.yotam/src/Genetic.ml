@@ -110,24 +110,29 @@ let fitprop_fn _ num pop =
     List.fold_left (fun acc (mfit, _) -> 
       match mfit with None -> failwith "missing fitness" | Some fit ->
         acc +. fit) 0. pop in
+  (*Printf.printf "total_init: %f" total_fitness; print_newline ();*)
   let _, (_,_,taken,left) = iterate_until
-    (fun state ->
-      iterate_until 
-        (fun ((j, (total, inv_total, t, r)) as current) ->
-          match r with
-          | [] -> invalid_arg "population too small"
-          | ((mfit,_) as tree)::rs ->
-            match mfit with None -> failwith "missing fitness" | Some fit ->
+    (fun (i, (tot, inv_tot, take, rest)) ->
+      if list_null rest then failwith "population too small" else
+      foldl_until_fin 
+        (fun (j, (total, inv_total, t, r)) ((mfit,_) as tree) ->
+          match mfit with None -> failwith "missing fitness" | Some fit ->
+            (*Printf.printf 
+             * "total: %f fit: %f inv: %f" total fit inv_total ;
+             *print_newline ();*)
             if roll_f @: fit *. inv_total (* *. is cheaper than /. *)
             then 
               let total' = total -. fit in
-              let inv_total' = (* update inverse total *)
-                if total' = 0. then 0. else 1. /. total' in 
-              j+1, (total', inv_total', tree::t, rs) (* we took out one tree *)
-            else current
+              if total' <= 0. then failwith "total fitness hit 0" else
+              let inv_total' = 1. /. total' in 
+              j+1, (total', inv_total', tree::t, r) 
+            else 
+              j,   (total,  inv_total,  t, tree::r)
         )
-        (fun (j, _) -> j >= num) (* stop condition *)
-        state
+        (fun (j, _) _ -> j >= num) (* stop condition *)
+        (fun (j, (tot, itot, t, r)) xs -> j, (tot, itot, t, r@xs)) (* fin *)
+        (i, (tot, inv_tot, take, []))
+        rest
     )
     (fun (j, _) -> j >= num) (* stop condition *)
     (0, (total_fitness, 1. /. total_fitness, [], pop))
@@ -190,9 +195,10 @@ let elitism_fn num rest parents children =
 
 (* ------- mutation ------- *)
 
+(* TODO debug: disabled mutation *)
 (* attrib_sets: num of values in attrib, list of attributes with that number *)
 let mutate labels values attrib_sets (tree':fit_tree_t) = 
-  let subset = random_subset [0;1;2] in
+  let subset = [] (* random_subset [0;1;2] *) in 
   let modify (tree:tree_t) = function
     (* change a decision variable in a node *)
     (* we can only change to another variable of equal arity *)
@@ -275,6 +281,18 @@ let best_fitness pop =
 
 (* ------- main function -------- *)
 
+(* attributes that can be swapped *)
+let calc_attrib_sets uniq_vals =
+    let s = list_mapi (fun (i, values) -> List.length values,i) uniq_vals in
+    let assoc = List.fold_left (fun acc (num, i) -> 
+        assoc_modify 
+          (function None -> [i] | Some xs -> i::xs)
+          num acc)
+      [] s in
+    (* keep only the sets that have more than 1 member *)
+    let sets = List.filter (fun (_,l) -> List.length l > 1) assoc in
+    list_map snd sets
+
 (* start a run of the genetic algorithm *)
 let genetic_run debug params (data:vector_t list) =
   let p = params in
@@ -292,22 +310,12 @@ let genetic_run debug params (data:vector_t list) =
 
   (* do some advanced legwork for mutation *)
   (* calculate sets of attribs and the number of values *)
-  let attrib_sets = 
-    let s = list_map (fun (values,i) -> List.length values,i) @:
-        insert_idx_snd 0 values_l in
-    let assoc = List.fold_left (fun acc (num, i) -> 
-        assoc_modify 
-          (function None -> [i] | Some xs -> i::xs)
-          num acc)
-      [] s in
-    (* keep only the sets that have more than 1 member *)
-    let sets = List.filter (fun (_,l) -> List.length l > 1) assoc in
-    list_map snd sets
-  in
+  let attrib_sets = calc_attrib_sets values_l in
 
   (* populate our initial crop with random trees *)
-  let start_pop = add_fitness @: random_trees labels values p.pop_size p.build_p
-  in
+  let start_pop = 
+    add_fitness @: random_trees labels values p.pop_size p.build_p in
+
   let rec loop pop gen old_fitness =
     if debug then (Printf.printf "Generation %d" gen; print_newline ());
     (* get a group of trees that'll make it to the next round *)
@@ -321,6 +329,8 @@ let genetic_run debug params (data:vector_t list) =
       mutate_all labels values attrib_sets p.mutation_p new_gen in
     let new_gen_f = add_fitness (mutated@rest) in
     (* do different things depending on our termination criterion *)
+    if debug then (Printf.printf "best: %f" (fst @: best_fitness new_gen_f); 
+      print_newline ());
     match p.termination, old_fitness with
       | Generations g, _ when gen >= g  -> best_fitness new_gen_f
       | Generations(g), _ -> loop new_gen_f (gen + 1) old_fitness
