@@ -10,20 +10,29 @@ let roll_f prob = Random.float 1. < prob
 (* randomness functions *)
 (* select x members at random, assuming equal likelihood *)
 let select_random num pop =
-  let prob = (foi num) /. (foi @: List.length pop) in
-  snd @: iterate_until   (* keep looping until we have enough *)
-    (fun (i, (take, rest)) -> 
-      foldl_until  (* loop over the population *)
-        (fun (j, (t, r)) tree ->
-          if roll_f prob
-          then (j+1, (tree::t, r))
-          else (j,   (t, tree::r))
+  let total = List.length pop in
+  let init_p = 1. /. foi total in
+  let _, (_, taken, left) = iterate_until (* keep looping until we have enough *)
+    (fun state -> 
+      iterate_until  (* loop over the population *)
+        (fun ((j, (p, t, r)) as current) ->
+          match r with 
+          | [] -> invalid_arg "pop too small"
+          | elem::rs ->
+            if roll_f p
+            then  (* adjust total and prob *)
+              let j' = j + 1 in
+              let total' = total - j' in
+              let p' = if total' = 0 then 0. else  1. /. foi total' in
+                 j+1, (p', elem::t, rs)
+            else current
         )
-        (fun (j, _) _ -> j >= num) (* stop condition *)
-        (i, (take, []))
-        rest)
+        (fun (j, _) -> j >= num) (* stop condition *)
+        state
+    )
     (fun (i, _) -> i >= num)
-    (0, ([], pop))
+    (0, (init_p, [], pop)) in
+  taken, left
 
 (* select members from one run over the population, at uniform prob *)
 let select_random_prob prob pop =

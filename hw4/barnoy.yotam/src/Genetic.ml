@@ -77,8 +77,8 @@ let prec_recall_fn tree l =
   let prec, recall = avg_prec_recall l in
   prec +. recall
 
-(* evaluate the fitness for all trees on the data, and return the trees with
- * normalized fitness values *)
+(* evaluate the fitness for all trees that don't already have 
+ * a fitness value *)
 let eval_fitness_all fitness_fn filter_p data (trees:fit_tree_t list) =
   let labels = fst @: List.split data in
   (* optionally filter out some of the data *)
@@ -104,21 +104,29 @@ let fitprop_fn _ num pop =
     List.fold_left (fun acc (mfit, _) -> 
       match mfit with None -> failwith "missing fitness" | Some fit ->
         acc +. fit) 0. pop in
-  let rec loop i taken rest = 
-    let i', (taken', rest') = 
-      foldl_until 
-        (fun (j, (t, r)) ((mfit, _) as tree) ->
-          match mfit with None -> failwith "missing fitness" | Some fit ->
-          if roll_f @: fit /. total_fitness 
-          then j+1, (tree::t, r)
-          else j, (t, tree::r))
-        (fun (j, _) _ -> j >= num) (* stop condition *)
-        (i, (taken, []))
-        rest in
-    if i' >= num then taken', rest' (* we have as many as we need *)
-    else loop i' taken' rest' (* do another run *)
+  let _, (_,_,taken,left) = iterate_until
+    (fun state ->
+      iterate_until 
+        (fun ((j, (total, inv_total, t, r)) as current) ->
+          match r with
+          | [] -> invalid_arg "population too small"
+          | ((mfit,_) as tree)::rs ->
+            match mfit with None -> failwith "missing fitness" | Some fit ->
+            if roll_f @: fit *. inv_total (* *. is cheaper than /. *)
+            then 
+              let total' = total -. fit in
+              let inv_total' = (* update inverse total *)
+                if total' = 0. then 0. else 1. /. total' in 
+              j+1, (total', inv_total', tree::t, rs) (* we took out one tree *)
+            else current
+        )
+        (fun (j, _) -> j >= num) (* stop condition *)
+        state
+    )
+    (fun (j, _) -> j >= num) (* stop condition *)
+    (0, (total_fitness, 1. /. total_fitness, [], pop))
   in
-  loop 0 [] pop
+  taken, left
 
 (* rank-based: just take the top num members *)
 let rank_fn _ num pop =
@@ -163,11 +171,11 @@ let crossover_all parents =
 (* ------- replacement functions -------- *)
 
 (* replacement: throw away all parents *)
-let replacement_fn _ singles parents children = children@singles
+let replacement_fn _ rest parents children = children@rest
 
 (* elitism: go by rank *)
-let elitism_fn num singles parents children =
-  let adults = parents@singles in
+let elitism_fn num rest parents children =
+  let adults = parents@rest in
   let sorted = sort_ascend_fst adults in
   let best = list_take num sorted in
   children@best
@@ -260,13 +268,12 @@ let best_fitness pop =
 (* ------- main function -------- *)
 
 (* start a run of the genetic algorithm *)
-let genetic_run print params (data:vector_t list) =
+let genetic_run debug params (data:vector_t list) =
   let p = params in
   (* calculate the number of trees we need to keep and to recombine *)
-  let keep_num = 
-    let n = iof @: (1. -. p.crossover_p) *. (foi p.pop_size) in
+  let breed_num = 
+    let n = iof @: p.crossover_p *. (foi p.pop_size) in
     if n mod 2 = 1 then n-1 else n in
-  let breed_num = p.pop_size - keep_num in
   (* curry a shortcut *)
   let add_fitness = eval_fitness_all p.fitness_fn p.filter_p data in
 
@@ -289,17 +296,19 @@ let genetic_run print params (data:vector_t list) =
     let sets = List.filter (fun (_,l) -> List.length l > 1) assoc in
     list_map snd sets
   in
-    
+
   (* populate our initial crop with random trees *)
   let start_pop = add_fitness @: random_trees labels values p.pop_size p.build_p
   in
   let rec loop pop gen old_fitness =
+    if debug then (Printf.printf "Generation %d" gen; print_newline ());
     (* get a group of trees that'll make it to the next round *)
-    let selected_pop, rest = p.selection_fn p keep_num pop in
-    (* get a group of parents *)
-    let parents, _ = p.selection_fn p breed_num rest in
+    let parents, rest = p.selection_fn p breed_num pop in
+    Printf.printf "select %d, rest %d" (List.length parents) (List.length
+  rest); print_newline ();
     let children = crossover_all parents in
-    let new_gen = p.replacement_fun p.pop_size selected_pop parents children in
+    let new_gen =
+      p.replacement_fun (p.pop_size-breed_num) rest parents children in
     let mutated, rest = 
       mutate_all labels values attrib_sets p.mutation_p new_gen in
     let new_gen_f = add_fitness (mutated@rest) in
