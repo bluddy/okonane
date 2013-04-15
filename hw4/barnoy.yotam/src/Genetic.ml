@@ -87,7 +87,7 @@ let recall_fn tree l =
 
 let prec_recall_fn tree l = 
   let prec, recall = avg_prec_recall l in
-  prec +. recall
+  (prec +. recall) *. 0.5
 
 (* evaluate the fitness for all trees that don't already have 
  * a fitness value *)
@@ -153,12 +153,11 @@ let rank_fn _ num pop =
 (* tournament: take a certain number of members, then take the best ones *)
 let tournament_fn p num pop =
   let tourn_size, win_num = p.tournament_size, p.tournament_winners in
+  (*Printf.printf "num: %d, pop: %d, tsize: %d\n" num (List.length pop) tourn_size;*)
   snd @: iterate_until
     (fun (i, (take, leave)) ->
       let tourn, rest = select_random tourn_size leave in
-      let to_take = if win_num > num - i 
-                    then num - i 
-                    else win_num in
+      let to_take = if win_num > num - i then num - i else win_num in
       let winners, losers = rank_fn () to_take tourn in
       i + to_take, (winners@take, losers@rest)
     )
@@ -204,7 +203,7 @@ let elitism_fn num rest parents children =
 (* TODO debug: disabled mutation *)
 (* attrib_sets: num of values in attrib, list of attributes with that number *)
 let mutate labels values attrib_sets (tree':fit_tree_t) = 
-  let subset = [0] (* random_subset [0;1;2] *) in 
+  let subset = [0;1;2] (* random_subset [0;1;2] *) in 
   let modify (tree:tree_t) = function
     (* change a decision variable in a node *)
     (* we can only change to another variable of equal arity *)
@@ -234,6 +233,7 @@ let mutate labels values attrib_sets (tree':fit_tree_t) =
             (other_attr, new_nlist))
         z in
       tree_of_zipper z' (* get the modified tree back *)
+
     (* add a node *)
     | 1 -> let nodes_leaves = tree_nodes_with_leaves tree in
       let chosen_node = random_select_one nodes_leaves in
@@ -246,18 +246,20 @@ let mutate labels values attrib_sets (tree':fit_tree_t) =
             let choice = Random.int leaves in
             (* modify the leaf we want to change *)
             let newlist = List.rev @: snd @: List.fold_left
-              (fun (i,acc) node ->
-                if i = choice 
-                then let new_node = match node with
+              (fun (i,acc) node -> match node with
                   (* use random_tree with a chance of 0 to make only leaves *)
-                  | Leaf(s, _) -> Node(s, snd @: random_tree labels values 0.)
-                  | Node _ -> failwith "error" in
-                  (i+1, new_node::acc)
-                else (i+1, node::acc))
-              (0,[]) nlist in
-            (a, newlist))
+                  | Leaf(s, _) when i = choice -> 
+                          i+1, Node(s, snd @: random_tree labels values 0.)::acc
+                  | Leaf _ -> i+1, node::acc
+                  | Node _ -> i,   node::acc)
+              (0,[]) 
+              nlist 
+            in
+            (a, newlist)
+          )
           z in
       tree_of_zipper z'
+
     (* delete a node *)
     | _ -> let tree_size = size_of_tree tree in
       if tree_size = 1 then tree (* can't delete any more *)
@@ -267,7 +269,7 @@ let mutate labels values attrib_sets (tree':fit_tree_t) =
         let z = zipper_at tree choice in
         let chosen_label = random_select_from_arr labels in
         match zipper_delete chosen_label z with
-        | None -> failwith "failed to delete at zipper"
+        | None    -> failwith "failed to delete at zipper"
         | Some z' -> tree_of_zipper z'
   in
   (* carry out any subset of mutations *)
@@ -325,7 +327,7 @@ let genetic_run debug params (data:vector_t list) =
     add_fitness @: random_trees labels values p.pop_size p.build_p in
 
   let rec loop pop gen old_fitness =
-    if debug then (Printf.printf "Generation %d" gen; print_newline ());
+    Printf.printf "Generation %d" gen; print_newline ();
     (* get a group of trees that'll make it to the next round *)
     let parents, rest = p.selection_fn p breed_num pop in
     let children = crossover_all parents in
@@ -345,10 +347,10 @@ let genetic_run debug params (data:vector_t list) =
       | Delta(d, max_g), (old_g, old_f) -> 
           let best, best_tree = best_fitness new_gen_f in
           let delta = best -. old_f in
-          if delta > d 
+          if abs_float delta >= d
           then loop new_gen_f (gen + 1) (gen, best)
           else (* delta small *)
-            if gen - old_g >= max_g then best, best_tree (* we're done *)
+            if gen - old_g > max_g then best, best_tree (* we're done *)
             else loop new_gen_f (gen + 1) (old_g, old_f)
   in
   snd @: loop start_pop 1 (0,0.)
@@ -364,14 +366,14 @@ let fitness_opts =
   ["precision", precision_fn; "recall", recall_fn; "mix", prec_recall_fn]
 
 (* default values -------- *)
-let default_delta_gen = 10
+let default_delta_gen = 15
 let default_delta = 0.01
 
 let default_params = {
     build_p = 0.2;
     fitness_fn = precision_fn;
     filter_p = 1.0;
-    pop_size = 1000;
+    pop_size = 100;
     selection_fn = fitprop_fn;
     tournament_size = 40;
     tournament_winners = 5;

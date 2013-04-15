@@ -19,7 +19,7 @@ let simpson3_8 f a b n : float =
   let sum = f a +. f b in
 
   let rec loop acc i = 
-    print_endline @: string_of_int i ^ "\n";
+    (*print_endline @: string_of_int i ^ "\n";*)
     match i with
     | j when j <= 0 -> acc
     | j -> 
@@ -29,7 +29,7 @@ let simpson3_8 f a b n : float =
   in 
   let sum' = loop sum (3 * n - 1) in
   let res = h *. sum' /. 8. in
-  print_endline @: "simpson: "^string_of_float sum;
+  (*print_endline @: "simpson: "^string_of_float sum;*)
   res
 
 let a_num = 12
@@ -79,7 +79,7 @@ let gamma_incomplete_q a x =
   let y = loop aa1 in
   let y' = if y > x then x else y in
 
-  print_endline @: string_of_float y';
+  (*print_endline @: string_of_float y';*)
   let v = simpson3_8 f0' 0. y' (int_of_float @: y' /. h) in
   let v' = v /. gamma_spouge a in
   1. -. v'

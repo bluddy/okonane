@@ -11,29 +11,31 @@ let roll_f prob = Random.float 1. < prob
 (* select x members at random, assuming equal likelihood *)
 let select_random num pop =
   let total = List.length pop in
-  let init_p = 1. /. foi total in
+  let init_p = foi num /. foi total in
   let _, (_, taken, left) = 
     iterate_until (* keep looping until we have enough *)
       (fun (i, (prob, take, rest)) -> 
+        (*Printf.printf "-take: %d, rest: %d\n" (List.length take) (List.length rest);*)
         if list_null rest then failwith "population too small" else
         foldl_until_fin  (* loop over the population *)
           (fun (j, (p, t, r)) x ->
+              (*Printf.printf "j: %d\n" j;*)
               if roll_f p
               then  (* adjust total and prob *)
-                let j' = j + 1 in
-                let total' = total - j' in
+                let j' = j-1 in
+                let total' = total - num + j' in
                 if total' <= 0 then failwith "total num reached 0" else
-                let p' = 1. /. foi total' in
-                   j+1, (p', x::t, r)
+                let p' = foi j' /. foi total' in
+                   j',  (p', x::t, r)
               else j,   (p,  t, x::r)
           )
-          (fun (j, _) _ -> j >= num) (* stop condition *)
+          (fun (j, _) _ -> j <= 0) (* stop condition *)
           (fun (j, (p, t, r)) xs -> j, (p, t, r@xs))
-          (0, (prob, take, []))
+          (i, (prob, take, []))
           rest
       )
-      (fun (i, _) -> i >= num)
-      (0, (init_p, [], pop)) in
+      (fun (i, _) -> i <= 0)
+      (num, (init_p, [], pop)) in
   taken, left
 
 (* select members from one run over the population, at uniform prob *)

@@ -68,7 +68,7 @@ let param_specs = Arg.align
         "-k", Arg.Set_int k, " Number of folds for k-folds (default: 10)";
         "-d", Arg.Set  Genetic.debug, " Show debug information";
         "-t", Arg.Set print_tree, " Print the tree(s)";
-        "--size", Arg.Int set_pop_size, " Population Size (default: 1000) ";
+        "--size", Arg.Int set_pop_size, " Population Size (default: 100) ";
         "--pbuild", Arg.Float set_build_p, " Initial tree building probability (default: 0.2)";
         "--fit", Arg.String set_fitness_fn, " Fitness function (default: precision)";
         "--filter", Arg.Float set_filter_p, " Data filter percentage (default: 1.0)";
@@ -78,7 +78,7 @@ let param_specs = Arg.align
         "--replace", Arg.String set_replacement_fn, " Replacement function (default: replacement)";
         "--gen", Arg.Int set_generations, " Termination criterion: number of generations (default:no)  ";
         "--delta", Arg.Float set_delta, " Termination criterion: minimum delta to continue (default: 0.01)";
-        "--deltagen", Arg.Int set_delta_gen, " Termination criterion: num of generations to wait for delta (default: 100)";
+        "--deltagen", Arg.Int set_delta_gen, " Termination criterion: num of generations to wait for delta (default: 15)";
         "--tsize", Arg.Int set_t_size, " Tournament size (default: 40)";
         "--twin", Arg.Int set_t_win, " Tournament winners (default: 5)";
     ]
