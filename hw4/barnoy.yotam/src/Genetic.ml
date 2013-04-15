@@ -198,7 +198,7 @@ let elitism_fn num rest parents children =
 (* TODO debug: disabled mutation *)
 (* attrib_sets: num of values in attrib, list of attributes with that number *)
 let mutate labels values attrib_sets (tree':fit_tree_t) = 
-  let subset = [] (* random_subset [0;1;2] *) in 
+  let subset = [0] (* random_subset [0;1;2] *) in 
   let modify (tree:tree_t) = function
     (* change a decision variable in a node *)
     (* we can only change to another variable of equal arity *)
@@ -208,6 +208,7 @@ let mutate labels values attrib_sets (tree':fit_tree_t) =
       let tree_attribs = attribs_of_tree tree in
       let tree_attribs' = 
         List.filter (fun (_,attr) -> List.mem attr pos_attribs) tree_attribs in
+      (* choose one of the allowable nodes *)
       let node_num, attr = random_select_one tree_attribs' in
       let set = List.find (fun set -> List.mem attr set) attrib_sets in
       let other_attr = random_select_one @: list_remove attr set in
