@@ -102,13 +102,13 @@ let zipper_fold_until f p init tree =
     (*print_endline "here";*)
     let rec loop_children a z =
       (*print_endline "there";*)
-      if p a z then a
-      else
         let a' = loop a z in
-        match zipper_right z with
-        | None    -> a'
-        | Some z' -> loop_children a' z' (* loop over children *)
+        if p a' z then a' else
+          match zipper_right z with
+          | None    -> a'
+          | Some z' -> loop_children a' z' (* loop over children *)
     in
+    (*Printf.printf "at %d" (fst @: snd z); print_newline ();*)
     if p acc z then acc
     else
       let acc' = f acc z in
@@ -123,15 +123,13 @@ let zipper_fold f init tree =
 
 (* get a zipper at a location in the tree *)
 let zipper_at tree i : zipper_t =
-  if i = 0 then zipper_of_tree tree 
-  else
-    let n = ref 0 in
-    let z = zipper_fold_until
-        (fun _ z -> n := !n + 1; Some z)
-        (fun _ _ -> !n >= i)
-        None tree in
-    match z with None -> invalid_arg @: "node "^soi i^" not found in tree"
-     | Some z' -> z'
+  let n = ref 0 in
+  let z = zipper_fold_until
+    (fun _ z -> n := !n + 1; z)
+    (fun _ _ -> !n > i)
+    (zipper_of_tree tree) tree in
+  if !n < i then invalid_arg @: "node "^soi i^" not found in tree"
+  else z
    
 (* stringification functions *)
 let rec string_of_val = function

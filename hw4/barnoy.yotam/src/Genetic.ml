@@ -49,16 +49,19 @@ let sort_descend_fst l =
 
 (* p is the chance of making a node *)
 let random_tree labels values p : fit_tree_t =
+  let max_depth = 8 in
   let l_num, a_num = Array.length labels, Array.length values in
-  let rec loop value = 
+  let inv_p = 1. -. p in
+  let rec loop value depth = 
+    (*Printf.printf "d = %d" depth; print_newline ();*)
     let attr = Random.int a_num in (* random attribute *)
     let attr_vals = array_map (fun v ->
-        if roll_f p then loop v
-        else Leaf(v, labels.(Random.int l_num)))
+        if (roll_f inv_p) || (depth > max_depth) then Leaf(v, labels.(Random.int l_num))
+        else loop v (depth+1))
       values.(attr) in
     Node(value, (attr, attr_vals))
   in
-  let tree = match loop "" with Node(_,t) -> t | _ -> failwith "error" in
+  let tree = match loop "" 1 with Node(_,t) -> t | _ -> failwith "error" in
   None, tree
 
 (* build all the starting members of our population *)
@@ -208,6 +211,7 @@ let mutate labels values attrib_sets (tree':fit_tree_t) =
       let tree_attribs = attribs_of_tree tree in
       let tree_attribs' = 
         List.filter (fun (_,attr) -> List.mem attr pos_attribs) tree_attribs in
+      if list_null tree_attribs' then tree else
       (* choose one of the allowable nodes *)
       let node_num, attr = random_select_one tree_attribs' in
       let set = List.find (fun set -> List.mem attr set) attrib_sets in
@@ -321,8 +325,6 @@ let genetic_run debug params (data:vector_t list) =
     if debug then (Printf.printf "Generation %d" gen; print_newline ());
     (* get a group of trees that'll make it to the next round *)
     let parents, rest = p.selection_fn p breed_num pop in
-    Printf.printf "select %d, rest %d" (List.length parents) (List.length
-  rest); print_newline ();
     let children = crossover_all parents in
     let new_gen =
       p.replacement_fun (p.pop_size-breed_num) rest parents children in
@@ -363,7 +365,7 @@ let default_delta_gen = 10
 let default_delta = 0.01
 
 let default_params = {
-    build_p = 0.3;
+    build_p = 0.25;
     fitness_fn = precision_fn;
     filter_p = 1.0;
     pop_size = 1000;
