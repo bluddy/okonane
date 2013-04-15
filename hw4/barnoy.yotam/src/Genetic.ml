@@ -49,19 +49,22 @@ let sort_descend_fst l =
 
 (* p is the chance of making a node *)
 let random_tree labels values p : fit_tree_t =
-  let max_depth = 8 in
+  let max_nodes = 2000 in
+  let n = ref 0 in
   let l_num, a_num = Array.length labels, Array.length values in
   let inv_p = 1. -. p in
-  let rec loop value depth = 
-    (*Printf.printf "d = %d" depth; print_newline ();*)
+  let rec loop value = 
+    n := !n + 1;
+    (*Printf.printf "n = %d" !n; print_newline ();*)
     let attr = Random.int a_num in (* random attribute *)
-    let attr_vals = array_map (fun v ->
-        if (roll_f inv_p) || (depth > max_depth) then Leaf(v, labels.(Random.int l_num))
-        else loop v (depth+1))
+    let attr_vals = 
+      array_map (fun v ->
+        if roll_f inv_p || !n > max_nodes then Leaf(v, labels.(Random.int l_num))
+        else loop v)
       values.(attr) in
     Node(value, (attr, attr_vals))
   in
-  let tree = match loop "" 1 with Node(_,t) -> t | _ -> failwith "error" in
+  let tree = match loop "" with Node(_,t) -> t | _ -> failwith "error" in
   None, tree
 
 (* build all the starting members of our population *)
@@ -89,12 +92,12 @@ let prec_recall_fn tree l =
 (* evaluate the fitness for all trees that don't already have 
  * a fitness value *)
 let eval_fitness_all fitness_fn filter_p data (trees:fit_tree_t list) =
-  let labels = fst @: List.split data in
   (* optionally filter out some of the data *)
   let filtered_data = match filter_p with
     | 1. -> data
     | p  -> List.filter (fun _ -> roll_f p) data in
   (* for each tree, classify the data and apply the fitness function *)
+  let labels = fst @: List.split filtered_data in
   List.fold_left (fun acc (old_fit,tree) ->
       match old_fit with 
       | Some f -> (old_fit, tree)::acc (* skip fitted trees *)
@@ -365,7 +368,7 @@ let default_delta_gen = 10
 let default_delta = 0.01
 
 let default_params = {
-    build_p = 0.25;
+    build_p = 0.2;
     fitness_fn = precision_fn;
     filter_p = 1.0;
     pop_size = 1000;

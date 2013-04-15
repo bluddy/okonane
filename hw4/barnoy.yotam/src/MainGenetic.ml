@@ -69,7 +69,7 @@ let param_specs = Arg.align
         "-d", Arg.Set  Genetic.debug, " Show debug information";
         "-t", Arg.Set print_tree, " Print the tree(s)";
         "--size", Arg.Int set_pop_size, " Population Size (default: 1000) ";
-        "--pbuild", Arg.Float set_build_p, " Initial tree building probability (default: 0.3)";
+        "--pbuild", Arg.Float set_build_p, " Initial tree building probability (default: 0.2)";
         "--fit", Arg.String set_fitness_fn, " Fitness function (default: precision)";
         "--filter", Arg.Float set_filter_p, " Data filter percentage (default: 1.0)";
         "--select", Arg.String set_selection_fn, " Selection function (default: fitprop)";
