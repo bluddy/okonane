@@ -358,7 +358,7 @@ let fitness_opts =
   ["precision", precision_fn; "recall", recall_fn; "mix", prec_recall_fn]
 
 (* default values -------- *)
-let default_delta_gen = 100
+let default_delta_gen = 10
 let default_delta = 0.01
 
 let default_params = {
