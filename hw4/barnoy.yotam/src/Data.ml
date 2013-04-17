@@ -38,21 +38,30 @@ let get_data_counts l (index:int) =
   in
   List.fold_left do_fold [] l
 
+(* sum over labels *)
+let sum_over_data_counts counts =
+  list_map 
+    (fun (value, label_counts) -> value, sum_counts label_counts)
+    counts
+
+let get_num_attribs (l:vector_t list) : int = Array.length @: snd @: list_head l
+
+let get_all_data_counts l = 
+  list_populate (get_data_counts l) 0 @: get_num_attribs l
+
 (* get unique values for an attribute *)
 let uniq_values (l:vector_t list) index = 
   nubf (fun (_,vec) -> vec.(index)) l
 
 (* get all unique values for all attributes *)
 let all_uniq_values (l:vector_t list) =
-  let (_, vec) = list_head l in
-  let len = Array.length vec in
+  let len = get_num_attribs l in
   list_populate (uniq_values l) 0 len
-
-(* sum over labels *)
-let sum_over_data_counts counts =
-  list_map 
-    (fun (value, label_counts) -> value, sum_counts label_counts)
-    counts
+  
+(* find an attrib with the smallest number of values *)
+let get_min_val_count_attrib (l:vector_t list) : int=
+  let vals = insert_idx_fst 0 @: all_uniq_values l in
+  fst @: fst @: list_min vals snd
 
 (* get the counts of labels in the data into a list of (label; count) *)
 (* must have labels *)

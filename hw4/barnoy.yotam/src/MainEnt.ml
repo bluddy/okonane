@@ -3,9 +3,9 @@ open Entropy
 
 let error s = prerr_endline s; exit 1
 
-let debug = ref false
 let use_gr = ref false
 let use_chi = ref false
+let chi_filter = ref false
 let file = ref ""
 let k = ref 10 (* k-folding *)
 let print_tree = ref false
@@ -28,8 +28,8 @@ let main () =
   if !file = "" then
     (Arg.usage param_specs usage_msg; error "\nNo input files specified");
   let d = Data.load_data "," !file in
-  let results =
-    Test.k_fold !k d (Entropy.tree_of_data !debug !use_gr !use_chi) Test.test in
+  let results = Test.k_fold !k d 
+      (Entropy.tree_of_data !use_gr !use_chi) Test.test in
   Test.print_results_all !print_tree results
 
 let _ = main ()

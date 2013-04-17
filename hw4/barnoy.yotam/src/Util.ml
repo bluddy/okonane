@@ -1,5 +1,9 @@
 (* Utilities that are useful *)
 
+(* base 2 logarithm *)
+let log_conv = 1. /. log 2.
+let log2 x = log x *. log_conv
+
 (* abbreviations for annoyingly long functions *)
 let foi = float_of_int
 let iof = int_of_float

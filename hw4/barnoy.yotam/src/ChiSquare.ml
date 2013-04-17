@@ -6,6 +6,8 @@ open Util
 
 (* note: there's some sort of bug that prevents looking up with a dof of 1. We
  * hardcode the answers for that *)
+(* another note: this code is really bad. Once you hit >280 dof you get nans.
+ * We'll use a hack to make it work in those ranges, but only for 0.05 *)
 
 (*external gamma_q : float -> float -> float = "GammaIncomplete_Q"*)
  
@@ -73,32 +75,50 @@ let gamma_incomplete_q a x =
   let aa1 = a -. 1. in
   let f0' = f0 aa1 in
   let rec loop y =
-    if (f0' y) *. (x -. y) > 2.0e-8 && y < x then loop (y +. 0.4)
+    if (f0' y) *. (x -. y) > 2.0e-20 && y < x then loop (y +. 0.3)
     else y
   in 
   let y = loop aa1 in
   let y' = if y > x then x else y in
 
   (*print_endline @: string_of_float y';*)
-  let v = simpson3_8 f0' 0. y' (int_of_float @: y' /. h) in
+  let v = simpson3_8 f0' 0. y' (iof @: y' /. h) in
   let v' = v /. gamma_spouge a in
   1. -. v'
 
 let df1_vals = [0.001, 0.975; 0.004, 0.95; 0.016, 0.9; 2.706, 0.1; 
   3.841, 0.05; 5.024, 0.025; 6.635, 0.01; 7.879, 0.005] 
 
+let high_df_vals = 
+  [280., 320.0277; 300., 341.3951; 400., 447.6324; 500., 553.1268; 
+  600., 658.0935; 700., 762.6606; 800., 866.9113]
+
+(* use our lists to look up and interpolate (or exterpolate) values *)
+let search_interpolate l input =
+  let interpolate (x1,y1) (x2,y2) (z:float) =
+    let d = (y2 -. y1) /. (x2 -. x1) in
+    let delta = d *. (z -. x1) in
+    y1 +. delta in
+  let l_rev = List.rev l in
+  let smaller = list_find (fun (v, _) -> input > v) l_rev in
+  let bigger = list_find (fun (v, _) -> input < v) l in
+  begin match smaller, bigger with
+  | None, None -> invalid_arg "error"
+  (* biggest number *)
+  | Some x, None -> interpolate (List.nth l_rev 1) x input
+  (* smallest number *)
+  | None, Some y -> interpolate y (List.nth l 1) input
+  (* in the middle *)
+  | Some x, Some y -> interpolate x y input
+  end
+
 (* the actual probability function *)
 let chi2prob dof distance = match dof with
-  | 1 -> let df1_rev = List.rev df1_vals in
-    let smaller = list_find (fun (v, _) -> distance > v) df1_rev in
-    let bigger = list_find (fun (v, _) -> distance < v) df1_vals in
-    begin match smaller, bigger with
-    | None, None -> invalid_arg "error"
-    | Some x, None | None, Some x -> snd x
-    | Some (x1, x2), Some (y1, y2) -> 
-        let delta = (distance -. x1) /. (y1 -. x1) in
-        let delta' = delta *. (y2 -. x2) in
-        x2 +. delta'
-    end
+  | 1 -> let v = search_interpolate df1_vals distance in
+         if v < 0. then 0. else v
+  | x when x > 280 -> (* the code can't handle this range. hack!!! *)
+      let point5 = search_interpolate high_df_vals (foi x) in
+      if distance >= point5 then 0.
+      else 1.
   | _ -> gamma_incomplete_q (0.5 *. (float_of_int dof)) (0.5 *. distance)
 
