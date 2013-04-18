@@ -118,15 +118,15 @@ let eval_fitness_all fitness_fn filter_p data (trees:fit_tree_t list) =
 (* Selection functions ------ *)
 (* fitness proportionate function *)
 let fitprop_fn _ num pop =
-  print_endline "in fitprop";
+  (*print_endline "in fitprop";*)
   let total_fitness, acc_pop = List.fold_left (fun (sum, acc) ((mfit, _) as t) ->
       match mfit with None -> failwith "missing fitness" | Some fit ->
       sum +. fit, (sum, t)::acc)
     (0.,[]) 
     pop in
   let pop' = List.rev acc_pop in
-  List.iter (fun (i,_) -> Printf.printf "%f " i) pop'; print_newline ();
-  Printf.printf "%f\n" total_fitness; print_newline ();
+  (*List.iter (fun (i,_) -> Printf.printf "%f " i) pop'; print_newline ();*)
+  (*Printf.printf "%f\n" total_fitness; print_newline ();*)
   let pop_arr = Array.of_list pop' in (* array for bin search *)
   (* pick with replacement *)
   let res = snd @: iterate_until (fun (j,acc) -> 
@@ -137,7 +137,8 @@ let fitprop_fn _ num pop =
         j+1, t::acc)
     (fun (j,_) -> j >= num)
     (0, []) in
-  print_endline "out"; res
+  res
+  (*print_endline "out"; res*)
 
 
 (* rank-based: we go by rank *)
@@ -315,7 +316,7 @@ let calc_attrib_sets uniq_vals =
     list_map snd sets
 
 (* start a run of the genetic algorithm *)
-let genetic_run debug params (data:vector_t list) =
+let genetic_run params (data:vector_t list) =
   let p = params in
   (* curry a shortcut *)
   let add_fitness = eval_fitness_all p.fitness_fn p.filter_p data in
@@ -334,7 +335,7 @@ let genetic_run debug params (data:vector_t list) =
     add_fitness @: random_trees labels values p.pop_size p.build_p in
 
   let rec loop pop gen old_fitness =
-    Printf.printf "Generation %d" gen; print_newline ();
+    if !debug then (Printf.printf "Generation %d" gen; print_newline ());
     (* get a group of trees that'll make it to the next round *)
     let candidates = p.selection_fn p p.pop_size pop in
     let children,parents,rest = do_crossover p.crossover_p candidates in
@@ -345,8 +346,7 @@ let genetic_run debug params (data:vector_t list) =
       mutate_all labels values attrib_sets p.mutation_p new_gen in
     let new_gen_f = (add_fitness mutated)@rest in
     (* do different things depending on our termination criterion *)
-    if debug then (Printf.printf "best: %f" (fst @: best_fitness new_gen_f); 
-      print_newline ());
+    if !debug then (Printf.printf "best: %f" (fst @: best_fitness new_gen_f); print_newline ());
     match p.termination, old_fitness with
       | Generations g, _ when gen >= g  -> best_fitness new_gen_f
       | Generations(g), _ -> loop new_gen_f (gen + 1) old_fitness
@@ -358,7 +358,9 @@ let genetic_run debug params (data:vector_t list) =
           if abs_float delta >= d
           then loop new_gen_f (gen + 1) (gen, best)
           else (* delta small *)
-            if gen - old_g > max_g then best, best_tree (* we're done *)
+            if gen - old_g > max_g then 
+              (Printf.printf "Converged to %f in %d generations.\n" best gen;
+              best, best_tree (* we're done *))
             else loop new_gen_f (gen + 1) (old_g, old_f)
   in
   snd @: loop start_pop 1 (0,0.)

@@ -101,7 +101,7 @@ let main () =
   if !file = "" then
     (Arg.usage param_specs usage_msg; error "\nNo input files specified");
   let d = Data.load_data "," !file in
-  let results = Test.k_fold !k d (Genetic.genetic_run !Genetic.debug !params) Test.test in
+  let results = Test.k_fold !k d (Genetic.genetic_run !params) Test.test in
   Test.print_results_all !print_tree results
 
 let _ = main ()
