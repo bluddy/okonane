@@ -77,17 +77,24 @@ let random_trees labels values pop_size p : fit_tree_t list =
 
 (* -------- fitness functions ------- *)
 
+(* try to reward smaller trees *)
+let size_penalty = 0.0001
+
 let precision_fn tree l = 
+  let size = size_of_tree tree in
   let prec = fst @: avg_prec_recall l in
-  prec
+  prec -. (foi size) *. size_penalty
 
 let recall_fn tree l =
+  let size = size_of_tree tree in
   let recall = snd @: avg_prec_recall l in
-  recall
+  recall -. (foi size) *. size_penalty
 
 let prec_recall_fn tree l = 
+  let size = size_of_tree tree in
   let prec, recall = avg_prec_recall l in
-  (prec +. recall) *. 0.5
+  let res = (prec +. recall) *. 0.5 in
+  res -. (foi size) *. size_penalty
 
 (* evaluate the fitness for all trees that don't already have 
  * a fitness value *)
@@ -101,8 +108,7 @@ let eval_fitness_all fitness_fn filter_p data (trees:fit_tree_t list) =
   List.fold_left (fun acc (old_fit,tree) ->
       match old_fit with 
       | Some f -> (old_fit, tree)::acc (* skip fitted trees *)
-      | None   -> 
-        let classes = 
+      | None   -> let classes = 
           list_map (fun datum -> classify tree datum) filtered_data in
         let fitness = fitness_fn tree @: list_zip labels classes in
         (Some fitness, tree)::acc
@@ -128,8 +134,9 @@ let fitprop_fn _ num pop =
              *print_newline ();*)
             if roll_f @: fit *. inv_total (* *. is cheaper than /. *)
             then 
-              let total' = total -. fit in
-              if total' <= 0. then failwith "total fitness hit 0" else
+              let total'' = total -. fit in
+              if total'' <= 0. then print_endline "total fitness hit 0";
+              let total' = if total'' < 0. then 0. else total'' in
               let inv_total' = 1. /. total' in 
               j+1, (total', inv_total', tree::t, r) 
             else 
@@ -194,7 +201,7 @@ let replacement_fn _ rest parents children = children@rest
 (* elitism: go by rank *)
 let elitism_fn num rest parents children =
   let adults = parents@rest in
-  let sorted = sort_ascend_fst adults in
+  let sorted = sort_descend_fst adults in
   let best = list_take num sorted in
   children@best
 
@@ -366,8 +373,8 @@ let fitness_opts =
   ["precision", precision_fn; "recall", recall_fn; "mix", prec_recall_fn]
 
 (* default values -------- *)
-let default_delta_gen = 15
-let default_delta = 0.01
+let default_delta_gen = 20
+let default_delta = 0.002
 
 let default_params = {
     build_p = 0.2;
