@@ -38,6 +38,21 @@ let select_random num pop =
       (num, (init_p, [], pop)) in
   taken, left
 
+(* select randomly with replacement *)
+let select_random_replace_arr num pop_arr = 
+  let len = Array.length pop_arr in
+  snd @: iterate_until (fun (j,acc) ->
+      let rand = Random.int len in
+      let e = pop_arr.(rand) in
+      j+1, e::acc)
+    (fun (j,_) -> j >= num)
+    (0, [])
+
+(* select randomly with replacement *)
+let select_random_replace num pop = 
+  let pop_arr = Array.of_list pop in
+  select_random_replace_arr num pop_arr
+
 (* select members from one run over the population, at uniform prob *)
 let select_random_prob prob pop =
   List.fold_left  (* loop over the population *)

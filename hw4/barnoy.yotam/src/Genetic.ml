@@ -16,7 +16,7 @@ type termination_t = Generations of int | Delta of float * int
 (* function types *)
 type fitness_t = tree_t -> (label_t * label_t) list -> float
 type replacement_t = int -> pop_t -> pop_t -> pop_t -> pop_t
-type selection_t = parameters_t -> int -> pop_t -> pop_t * pop_t
+type selection_t = parameters_t -> int -> pop_t -> pop_t
 
 and parameters_t = {
     build_p : float;       (* prob used to build initial trees *)
@@ -118,58 +118,61 @@ let eval_fitness_all fitness_fn filter_p data (trees:fit_tree_t list) =
 (* Selection functions ------ *)
 (* fitness proportionate function *)
 let fitprop_fn _ num pop =
-  let total_fitness = 
-    List.fold_left (fun acc (mfit, _) -> 
+  print_endline "in fitprop";
+  let total_fitness, acc_pop = List.fold_left (fun (sum, acc) ((mfit, _) as t) ->
       match mfit with None -> failwith "missing fitness" | Some fit ->
-        acc +. fit) 0. pop in
-  (*Printf.printf "total_init: %f" total_fitness; print_newline ();*)
-  let _, (_,_,taken,left) = iterate_until
-    (fun (i, (tot, inv_tot, take, rest)) ->
-      if list_null rest then failwith "population too small" else
-      foldl_until_fin 
-        (fun (j, (total, inv_total, t, r)) ((mfit,_) as tree) ->
-          match mfit with None -> failwith "missing fitness" | Some fit ->
-            (*Printf.printf 
-             * "total: %f fit: %f inv: %f" total fit inv_total ;
-             *print_newline ();*)
-            if roll_f @: fit *. inv_total (* *. is cheaper than /. *)
-            then 
-              let total'' = total -. fit in
-              if total'' <= 0. then print_endline "total fitness hit 0";
-              let total' = if total'' < 0. then 0. else total'' in
-              let inv_total' = 1. /. total' in 
-              j+1, (total', inv_total', tree::t, r) 
-            else 
-              j,   (total,  inv_total,  t, tree::r)
-        )
-        (fun (j, _) _ -> j >= num) (* stop condition *)
-        (fun (j, (tot, itot, t, r)) xs -> j, (tot, itot, t, r@xs)) (* fin *)
-        (i, (tot, inv_tot, take, []))
-        rest
-    )
-    (fun (j, _) -> j >= num) (* stop condition *)
-    (0, (total_fitness, 1. /. total_fitness, [], pop))
-  in
-  taken, left
+      sum +. fit, (sum, t)::acc)
+    (0.,[]) 
+    pop in
+  let pop' = List.rev acc_pop in
+  List.iter (fun (i,_) -> Printf.printf "%f " i) pop'; print_newline ();
+  Printf.printf "%f\n" total_fitness; print_newline ();
+  let pop_arr = Array.of_list pop' in (* array for bin search *)
+  (* pick with replacement *)
+  let res = snd @: iterate_until (fun (j,acc) -> 
+      let rand = Random.float total_fitness in
+      match binary_search pop_arr fst rand with 
+      | Found x | NotPresent x ->
+        let _, t = pop_arr.(x) in
+        j+1, t::acc)
+    (fun (j,_) -> j >= num)
+    (0, []) in
+  print_endline "out"; res
 
-(* rank-based: just take the top num members *)
+
+(* rank-based: we go by rank *)
 let rank_fn _ num pop =
-  let sorted = sort_descend_fst pop in
-  list_take num sorted, list_drop num sorted
+  let sorted_pop = sort_ascend_fst pop in
+  (* add up rank in one go *)
+  let add,total_rank', acc_pop = List.fold_left (fun (add, sum, acc) t ->
+      add + 1, sum + add, (sum, t)::acc)
+    (1,0,[]) 
+    sorted_pop in
+  let total_rank = total_rank' - add + 1 in (* correct for too much adding *)
+  let pop_arr = Array.of_list (List.rev acc_pop) in (* array for bin search *)
+  (* pick with replacement *)
+  snd @: iterate_until (fun (j,acc) -> 
+      let rand = Random.int total_rank in
+      match binary_search pop_arr fst rand with Found x | NotPresent x ->
+        let _, t = pop_arr.(x) in
+        j+1, t::acc)
+    (fun (j,_) -> j >= num)
+    (0, [])
 
 (* tournament: take a certain number of members, then take the best ones *)
 let tournament_fn p num pop =
   let tourn_size, win_num = p.tournament_size, p.tournament_winners in
   (*Printf.printf "num: %d, pop: %d, tsize: %d\n" num (List.length pop) tourn_size;*)
+  let pop_arr = Array.of_list pop in
   snd @: iterate_until
-    (fun (i, (take, leave)) ->
-      let tourn, rest = select_random tourn_size leave in
+    (fun (i, take) ->
+      let tourn = select_random_replace_arr tourn_size pop_arr in
       let to_take = if win_num > num - i then num - i else win_num in
-      let winners, losers = rank_fn () to_take tourn in
-      i + to_take, (winners@take, losers@rest)
+      let winners = rank_fn () to_take tourn in
+      i + to_take, winners@take
     )
     (fun (i, _) -> i >= num)
-    (0, ([], pop))
+    (0, [])
 
 (* ---- do crossover ----- *)
 let crossover (_,tree1) (_,tree2) = 
@@ -183,27 +186,28 @@ let crossover (_,tree1) (_,tree2) =
   let t1', t2' = tree_of_zipper z1', tree_of_zipper z2' in
   (None, t1'), (None, t2') (* remove old fitness *)
 
-let crossover_all parents =
-  let len = List.length parents / 2 in
-  let p1, p2 = list_take len parents, list_drop len parents in
-  let p = list_zip p1 p2 in
-  List.fold_left (fun acc (t1,t2) -> 
-      let t1', t2' = crossover t1 t2 in
-      t1'::t2'::acc)
-    []
-    p
+(* randomly do crossover *)
+let do_crossover prob candidates =
+  let rec loop ((children, parents, rest) as s) = function
+    | []       -> s
+    | [x]      -> children, parents, x::rest
+    | x::y::xs ->  
+        if roll_f prob then (* add children and parents *)
+          let w, z = crossover x y in
+          loop (w::z::children, x::y::parents, rest) xs
+        else
+          loop (children, parents, x::y::rest) xs
+  in loop ([], [], []) candidates
 
 (* ------- replacement functions -------- *)
 
 (* replacement: throw away all parents *)
-let replacement_fn _ rest parents children = children@rest
+let replacement_fn _ children parents rest = children@rest
 
 (* elitism: go by rank *)
-let elitism_fn num rest parents children =
-  let adults = parents@rest in
-  let sorted = sort_descend_fst adults in
-  let best = list_take num sorted in
-  children@best
+let elitism_fn num children parents rest =
+  let sorted = sort_descend_fst children@parents@rest in
+  list_take num sorted
 
 (* ------- mutation ------- *)
 
@@ -313,10 +317,6 @@ let calc_attrib_sets uniq_vals =
 (* start a run of the genetic algorithm *)
 let genetic_run debug params (data:vector_t list) =
   let p = params in
-  (* calculate the number of trees we need to keep and to recombine *)
-  let breed_num = 
-    let n = iof @: p.crossover_p *. (foi p.pop_size) in
-    if n mod 2 = 1 then n-1 else n in
   (* curry a shortcut *)
   let add_fitness = eval_fitness_all p.fitness_fn p.filter_p data in
 
@@ -336,13 +336,14 @@ let genetic_run debug params (data:vector_t list) =
   let rec loop pop gen old_fitness =
     Printf.printf "Generation %d" gen; print_newline ();
     (* get a group of trees that'll make it to the next round *)
-    let parents, rest = p.selection_fn p breed_num pop in
-    let children = crossover_all parents in
+    let candidates = p.selection_fn p p.pop_size pop in
+    let children,parents,rest = do_crossover p.crossover_p candidates in
+    let children' = add_fitness children in
     let new_gen =
-      p.replacement_fun (p.pop_size-breed_num) rest parents children in
+      p.replacement_fun p.pop_size children' parents rest in
     let mutated, rest = 
       mutate_all labels values attrib_sets p.mutation_p new_gen in
-    let new_gen_f = add_fitness (mutated@rest) in
+    let new_gen_f = (add_fitness mutated)@rest in
     (* do different things depending on our termination criterion *)
     if debug then (Printf.printf "best: %f" (fst @: best_fitness new_gen_f); 
       print_newline ());

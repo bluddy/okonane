@@ -247,6 +247,30 @@ let matrix_of_lists l =
   let l' = list_map Array.of_list l in
   Array.of_list l'
 
+type 'a bin_search_t = Found of int | NotPresent of int
+
+(* do a binary search over an array *)
+(* requires an ascending list *)
+let rec binary_search a fn value : 'a bin_search_t =
+  let len = Array.length a in
+  (*Printf.printf "in binsearch : len: %d" len; print_newline ();*)
+  let rec loop low high =
+    (*Printf.printf "low: %d high: %d" low high; print_newline ();*)
+    if high = low then
+      if fn (a.(low)) = value then Found low
+      else NotPresent low
+    else let mid = (low + high) / 2 in
+      if fn(a.(mid)) > value then
+        if low = mid then loop low mid
+        else loop low (mid - 1)
+      else if fn(a.(mid)) < value then
+        if high = mid then loop mid high
+        else loop (mid + 1) high
+      else
+        Found mid
+  in loop 0 (len-1)
+
+
 (* --- String functions --- *)
 (* split a string into lines *)
 let string_lines s = Str.split (Str.regexp "\n") s
