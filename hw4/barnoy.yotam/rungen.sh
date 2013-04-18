@@ -1,2 +1,2 @@
 #!/bin/bash
-./bin/MainGenetic.native $@
+time ./bin/MainGenetic.native $@
