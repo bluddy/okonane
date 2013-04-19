@@ -6,6 +6,9 @@ open MyRandom
 
 let debug = ref false
 
+let unwrap_fit = function None -> failwith "missing fitness" | Some f -> f
+let no_none_f = function None -> 0. | Some x -> x
+
 (* type of tree with fitness data attached *)
 type fit_tree_t = float option * tree_t
 type pop_t = fit_tree_t list
@@ -82,18 +85,19 @@ let size_penalty = 0.0001
 
 let precision_fn tree l = 
   let size = size_of_tree tree in
-  let prec = fst @: avg_prec_recall l in
+  let prec = no_none_f @: fst @: avg_prec_recall l in
   prec -. (foi size) *. size_penalty
 
 let recall_fn tree l =
   let size = size_of_tree tree in
-  let recall = snd @: avg_prec_recall l in
+  let recall = no_none_f @: snd @: avg_prec_recall l in
   recall -. (foi size) *. size_penalty
 
 let prec_recall_fn tree l = 
   let size = size_of_tree tree in
   let prec, recall = avg_prec_recall l in
-  let res = (prec +. recall) *. 0.5 in
+  let prec', recall' = no_none_f prec, no_none_f recall in
+  let res = (prec' +. recall') *. 0.5 in
   res -. (foi size) *. size_penalty
 
 (* evaluate the fitness for all trees that don't already have 
@@ -105,7 +109,7 @@ let eval_fitness_all fitness_fn filter_p data (trees:fit_tree_t list) =
     | p  -> List.filter (fun _ -> roll_f p) data in
   (* for each tree, classify the data and apply the fitness function *)
   let labels = fst @: List.split filtered_data in
-  List.fold_left (fun acc (old_fit,tree) ->
+  let new_pop = List.fold_left (fun acc (old_fit,tree) ->
       match old_fit with 
       | Some f -> (old_fit, tree)::acc (* skip fitted trees *)
       | None   -> let classes = 
@@ -113,7 +117,11 @@ let eval_fitness_all fitness_fn filter_p data (trees:fit_tree_t list) =
         let fitness = fitness_fn tree @: list_zip labels classes in
         (Some fitness, tree)::acc
     ) 
-    [] trees
+    [] trees in
+  if !debug then (print_endline "Fitnesses: ";
+    List.iter (fun (mf,_) -> Printf.printf " %f" (unwrap_fit mf)) new_pop;
+    print_endline "\n"); 
+  new_pop
 
 (* get the avg fitness of a whole population *)
 let avg_fitness pop =
@@ -161,8 +169,8 @@ let rank_fn _ num pop =
     (2,0,[]) 
     sorted_pop in
   let total_rank = total_rank' - add + 1 in (* correct for too much adding *)
-  List.iter (fun (i,_) -> Printf.printf "%d " i) acc_pop; print_newline ();
-  Printf.printf "total: %i\n" total_rank; print_newline ();
+  (*List.iter (fun (i,_) -> Printf.printf "%d " i) acc_pop; print_newline ();*)
+  (*Printf.printf "total: %i\n" total_rank; print_newline ();*)
   let pop_arr = Array.of_list (List.rev acc_pop) in (* array for bin search *)
   (* pick with replacement *)
   snd @: iterate_until (fun (j,acc) -> 

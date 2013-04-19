@@ -4,6 +4,12 @@ open Util
 open Tree
 open Data
 
+let filter_none l = 
+  let no_none = List.fold_left 
+    (fun acc -> function None -> acc | Some x -> x::acc) 
+    [] l in
+  List.rev no_none
+
 (* classify a vector according to a tree *)
 let classify tree vector =
   let vec = snd vector in (* ignore label *)
@@ -28,14 +34,16 @@ let classify_all tree l = list_map (classify tree) l
 (* calculate the accuracy for a set of labels and classification outputs *)
 (* l is a zipped list of labels, outputs *)
 let accuracy l =
+  let len = List.length l in
   let correct = List.fold_left (fun acc (label, out) ->
       if label = out then acc+1 else acc) 
     0 l in
-  (foi correct) /. (foi @: List.length l)
+  if len <> 0 then Some ((foi correct) /. foi len)
+  else None
 
 (* calculate precision and recall for a particular class *)
 (* l is a zipped list of labels, outputs *)
-let stats_of class_label l =
+let stats_of l class_label =
   let t_pos, f_pos, pos = List.fold_left 
     (fun (t_pos, f_pos, pos) (label, out) ->
       match label = class_label, out = class_label with
@@ -44,21 +52,24 @@ let stats_of class_label l =
       | false, true -> t_pos  , f_pos+1, pos
       | _, _        -> t_pos  , f_pos,   pos)
     (0,0,0) l in
-  let recall = (foi t_pos) /. (foi pos) in
-  let precision = (foi t_pos) /. (foi @: t_pos + f_pos) in
+  let recall = if pos <> 0 then Some ((foi t_pos) /. (foi pos)) else None in
+  let precision = if t_pos + f_pos <> 0 
+    then Some ((foi t_pos) /. (foi @: t_pos + f_pos)) else None in
   recall, precision
 
 (* calculate average stats for whole dataset *)
 (* l is a zipped list of labels, outputs *)
 let avg_prec_recall l =
+  (* choose classes to operate over *)
   let uniq_labels = nub @: fst @: List.split l in
-  let tot_r, tot_p = List.fold_left
-    (fun (tot_r, tot_p) label ->
-      let r, p = stats_of label l in
-      tot_r +. r, tot_p +. p)
-    (0.,0.) uniq_labels in
-  let len = foi @: List.length uniq_labels in
-  tot_r /. len, tot_p /. len
+  let r_ps = List.split @: list_map (stats_of l) uniq_labels in
+  let rs, ps = fst r_ps, snd r_ps in
+  let rs, ps = filter_none rs, filter_none ps in
+  let r, len_r = List.fold_left (+.) 0. rs, List.length rs in
+  let p, len_p = List.fold_left (+.) 0. ps, List.length ps in
+  let r_res = if len_r = 0 then None else Some (r /. foi len_r) in
+  let p_res = if len_p = 0 then None else Some (p /. foi len_p) in
+  r_res, p_res
 
 (* calculate confusion matrix *)
 (* l is a zipped list of labels, outputs *)
@@ -127,9 +138,38 @@ let test tree data =
   let confm = confusion_matrix l in
   (acc, prec, recall, confm)
 
+(* print a maybe float *)
+let somf = function None -> "nan" | Some f -> string_of_float f
+
 (* print test results to the screen *)
 let print_results (acc, prec, recall, _) =
-  Printf.printf "Acc:%5f, Prec:%5f, Recal:%5f" acc prec recall
+  Printf.printf "Acc:%5s, Prec:%5s, Recal:%5s" 
+    (somf acc) (somf prec) (somf recall)
+
+let std_dev (data:float option list) : (float option * float option) =
+  let some_data = filter_none data in
+  let total = List.fold_left ((+.)) 0. some_data in
+  let len = List.length some_data in
+  let mean = if len <> 0 then Some(total /. foi len) else None in
+  let dev = match mean with None -> None
+    | Some m -> Some(
+        List.fold_left (fun acc x ->
+        let d = x -. m in
+        acc +. (d *. d))
+      0.
+      some_data) in
+  let std_dev = 
+    if len <> 0 then 
+      match dev with None -> None
+      | Some d -> Some(sqrt (d /. foi len)) 
+    else None in
+  mean, std_dev
+
+let avg_results rs = 
+  let a = std_dev @: list_map (fun (a,_,_,_) -> a) rs in
+  let b = std_dev @: list_map (fun (_,b,_,_) -> b) rs in
+  let c = std_dev @: list_map (fun (_,_,c,_) -> c) rs in
+  a,b,c
 
 (* prints the output of a k-fold *)
 let print_results_all print_tree rs =
@@ -147,6 +187,13 @@ let print_results_all print_tree rs =
       print_newline ();
       if (print_tree) then print_endline @: string_of_tree tree;
       print_newline ();
-    ) rs'
+    ) rs';
+  let test_res = list_map (fun (_, _, t) -> t) rs in
+  let (a_a,s_a),(a_p,s_p),(a_r,s_r) = avg_results test_res in
+  Printf.printf "avg_acc %s, avg_prec %s, avg_recall %s\n" 
+    (somf a_a) (somf a_p) (somf a_r);
+  Printf.printf "std_acc %s, std_prec %s, std_recall %s\n" 
+    (somf s_a) (somf s_p) (somf s_r)
+
 
 
