@@ -118,9 +118,9 @@ let eval_fitness_all fitness_fn filter_p data (trees:fit_tree_t list) =
         (Some fitness, tree)::acc
     ) 
     [] trees in
-  if !debug then (print_endline "Fitnesses: ";
-    List.iter (fun (mf,_) -> Printf.printf " %f" (unwrap_fit mf)) new_pop;
-    print_endline "\n"); 
+  (*if !debug then (print_endline "Fitnesses: ";*)
+    (*List.iter (fun (mf,_) -> Printf.printf " %f" (unwrap_fit mf)) new_pop;*)
+    (*print_endline "\n"); *)
   new_pop
 
 (* get the avg fitness of a whole population *)
@@ -356,7 +356,8 @@ let genetic_run params (data:vector_t list) =
     add_fitness @: random_trees labels values p.pop_size p.build_p in
 
   let rec loop pop gen old_fitness =
-    if !debug then (Printf.printf "Generation %d" gen; print_newline ());
+    if !debug then (Printf.printf "Generation %d count %d" gen (List.length pop); 
+      print_newline ());
     (* get a group of trees that'll make it to the next round *)
     let candidates = p.selection_fn p p.pop_size pop in
     let children,parents,rest = do_crossover p.crossover_p candidates in
