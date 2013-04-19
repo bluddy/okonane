@@ -6,7 +6,7 @@ open Genetic
 let error s = prerr_endline s; exit 1
 
 let file = ref ""
-let k = ref 10 (* k-folding *)
+let k = ref 8 (* k-folding *)
 let params = ref default_params
 let print_tree = ref false
 
@@ -65,7 +65,7 @@ let set_delta_gen i = set_optv i @: fun p x ->
 
 let param_specs = Arg.align 
     [
-        "-k", Arg.Set_int k, " Number of folds for k-folds (default: 10)";
+        "-k", Arg.Set_int k, " Number of folds for k-folds (default: 8)";
         "-d", Arg.Set  Genetic.debug, " Show debug information";
         "-t", Arg.Set print_tree, " Print the tree(s)";
         "--size", Arg.Int set_pop_size, " Population Size (default: 100) ";

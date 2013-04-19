@@ -7,12 +7,12 @@ let use_gr = ref false
 let use_chi = ref false
 let chi_filter = ref false
 let file = ref ""
-let k = ref 10 (* k-folding *)
+let k = ref 8 (* k-folding *)
 let print_tree = ref false
 
 let param_specs = Arg.align 
     [
-        "-k", Arg.Set_int k, " Number of folds for k-folds (default: 10)";
+        "-k", Arg.Set_int k, " Number of folds for k-folds (default: 8)";
         "-g", Arg.Set use_gr, " Use gain ratio (default: no)";
         "-t", Arg.Set print_tree, " Print the tree(s)";
         "-d", Arg.Set debug, " Show debug information (default: no)";
