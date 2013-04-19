@@ -35,7 +35,9 @@
 %
 % the graphicx package is one of several packages that can be used for
 % including images in a LaTeX document
-\usepackage{amsmath, amsthm, graphicx}
+\usepackage{amsmath, amsthm, graphicx,url}
+%\usepackage[natlib=true]{biblatex}
+%\bibliography{hw4bib}
 
 
 % the title should contain your title.  Note the "\\"; this causes a linebreak.
@@ -85,11 +87,9 @@ The task of a classification algorithm is to find patterns in a set of labeled v
 
 Decision trees codify a certain pattern in the data. As piece-wise functions with discrete inputs, they represent an arbitrarily complex conditional expression over the values of the data. 
 
-Practically speaking, implementing decision trees usually involves using whatever method the programming language possesses to describe a tree data structure. In C, this will involve pointers and structures, whereas a more object-oriented language will use a class-based approach. In OCaml, as in other functional languages, the natural method to describe trees is with ADTs, or \emph{Abstract Data Types}. We will examine this in more detail in section 3. Regardless, every member of a tree $T$ can be either an internal node or a leaf. An internal node of $T$ consists of an attribute $A_i$ possessing exactly $m_i$ children. Each child corresponds to a value $v_{ij}$ of the attribute $A_i$, and each child can be either another internal node or a leaf. Leaf nodes consist only of the value $v_{ij}$ they represent, and the label attached to them, $l_k$.
+Practically speaking, implementing decision trees usually involves using whatever method the programming language possesses to describe a tree data structure. In C, this will involve pointers and structures, whereas a more object-oriented language will use a class-based approach. In OCaml, as in other functional languages, the natural method to describe trees is with ADTs, or \emph{Abstract Data Types}. We will examine this in more detail in section 3. Regardless, every member of a tree $T$ can be either an internal node or a leaf. An internal node of $T$ consists of an attribute $A_i$ possessing exactly $m_i$ children. In fact, this is the main constraint of the decision tree structure, and it must not be violated or the tree is not a proper decision tree. Each child corresponds to a value $v_{ij}$ of the attribute $A_i$, and each child can be either another internal node or a leaf. Leaf nodes consist only of the value $v_{ij}$ they represent, and the label attached to them, $l_k$.
 
 After building a tree in the training phase, the way a label is chosen for a specific test vector is by following the nodes in the tree from the root of the tree down until a leaf node is reached. At every juncture in the tree, a value $v_ij$ is chosen corresponding to the value of attribute $A_i$ in the test vector. The choice determines the path to take. Once a leaf is reached, it serves as the predicted label for that test vector.
-
-TODO: insert tree here
 
 \subsection{Traditional Methods}
 The traditional method of building decision trees is a greedy algorithm known as ID3 (Iterative Dichotomiser 3)\cite{quinlan1986induction}. This algorithm consists of the following steps:
@@ -104,40 +104,147 @@ Given data $D$ consisting of labeled vectors as described above, and a list of r
 \end{enumerate}
 
 This algorithm is greedy since it cannot reason about the future: it cannot choose to split over a weaker attribute so that it may split more effectively later on.
+
 Of course, the tricky part is finding a heuristic with which to decide which node is the best node to split on. This is the real insight of ID3.
 
 % note the '*' character; this causes  a (sub)section to not be numbered.
 \subsubsection*{Entropy and Information Gain}
 
+ID3 uses a concept called entropy to choose the best attribute on which to split. Entropy in the mathematical sense refers to the \emph{Shannon entropy}, and is a borrowed term from information theory\cite{entropyWikipedia}, where it refers to the amount of uncertainty in a random variable as expressed in bits. The idea is that a purely deterministic signal contains no information: if I know that a random variable will always be $1$, then I don't need to convey anything about that variable. In this case, the variable has an entropy of $0$. On the other end of the scale is a 50-50 chance of having either $0$ or $1$. In this case, if we had to guess the value of the random variable, we'd have no information to go by. We would have to have 1 bit of information to let us know if $0$ or $1$ came up. In general, the more fair a random variable is (i.e. the more uniformly distributed), the greater the entropy, and the less predictable the variable is. The more skewed the probability distribution is, the lower the entropy, since we can better guess at the outcome of events. 
 
+The way this relates to decision trees is through a concept known as information gain. When we start out with our data, that data has a certain entropy to it, based on the relative frequency of the labels in the data. If the labels are uniformly distributed, the entropy of the data is high, but if some label classes are much more common than others, the entropy is lower -- we can guess that the majority labels will come up more often and we'd be right, assuming a similar distribution in the test and training data. The goal of a decision tree is to lower the entropy (uncertainty) of the data as much as possible, and the notion of lowering entropy is known as information gain. 
 
-Here, talk about the maximum information gain heuristic.  You should both give
-an intuitive feel for what it does and give the mathematics and theory behind
-it.  You should also discuss why it tends to work well for decision trees, and
-what strengths and weaknesses it has.  This should lead you into a discussion of
-gain ratio, which you can then define and contrast to straight information gain.
+Entropy is defined mathematically as 
+\begin{equation}
+    H(X) = - \sum_i P(x_i)\log_2 P(x_i) = - \sum_i \frac{n_i}{N} \log_2 \frac{n_i}{N}
+\end{equation}
+
+This means that for a given set of vectors, we iterate over every subset, taking the relative proportion of the particular subset of the data, taking the logarithm of that amount, and then scaling it by the same relative proportion. 
+
+Applying this to decision trees, we get the following:
+\begin{equation}
+    H(D) = - \sum_k \frac{|\{y_k \in D\}|}{|D|} \log_2 \frac{|\{y_k \in D\}|}{|D|}
+\end{equation}
+
+That is, we sum over the log of the relative frequencies of labels, multiplied by those relative frequencies.
+
+To evaluate the information gain from choosing a particular attribute for the decision tree, we need the difference in entropy before splitting the data on the particular attribute and the post-split entropy:
+\begin{equation}
+    IG(D,A_i) = H(D) - \sum_{v_{ij}} \frac{|\{\boldsymbol{x}\in D|x_{ij} = v_{ij}\}|}{|D|} \cdot H(\{\boldsymbol{x}\in D|x_{ij} = v_{ij}\})
+\end{equation}
+
+In other words, after we split the data, the label frequencies become distributed among the different attribute values for $A_i$, so we need to calculate all of those partial entropies and then weight them according to their to the relative frequencies of the values $v_{ij}$ in the data. This gives us the new entropy. Subtracting the new value from the old entropy gives us the information gain. If we try to maximize the information gain, i.e. we try to split on every attribute and choose the one that gives us the most information gain, we move the decision tree to the lowest state of entropy. Ideally, we'd like to categorize every label by splitting on an attribute --- every attribute should have only one kind of label. This would reduce our entropy to 0. The sooner we can get to minimal entropy, the more effective our decision tree. Of course, this is all assuming that the training data has the same distribution as the test data, which is not necessarily true.
+
+One issue that comes up with the information gain heuristic is that it doesn't work well for attributes $a_i$ where there are many values $v_{ij}$. The reason for this is that when you have an attribute with many possible values, those values tend to split up the data set into very small, uniform subsets. However, splitting the training data up into such small pieces is too specific. For example, if a unique name is attached to every vector in the training set, that attribute would score extremely well on the information gain heuristic, but it probably wouldn't do well with any other data. This is the problem of overfitting the test data.
+
+To compensate for problem sets that have attributes with many values, we can use a different heuristic known as information gain ratio (IG). This measure divides the information gain by the intrinsic value (IV) of the attribute, which consists of the entropy of the attribute with respect to its values:
+\begin{equation}
+    IV(D, a_i) = - \sum_k \frac{|\{\boldsymbol{x} \in D\}|{x_{ij} = v_{ij}}}{|D|} \log_2 \frac{|\{\boldsymbol{x} \in D\}|{x_{ij} = v_{ij}}}{|D|}
+\end{equation}
+
+Dividing the information gain by the intrinsic value of the attribute, we get
+\begin{equation}
+    IV(D, a_i) = \frac{IG(D, a_i)}{IV(D, a_i)}
+\end{equation}
+
+The reason this works is that the entropy over the attribute values grows for a uniformly distributed attribute. The more subdivisions splitting over the attribute values produces, the higher the intrinsic value of the attribute. This neutralizes some of the high score produced by the information gain.
+
+Thus, for data sets containing attributes with many values, we can use the information gain ratio rather than the information gain. But this is not the whole story. Even with information gain ratio as our measure, we can overfit the training data. This is because the ID3 algorithm will keep adding nodes to our tree so long as an attribute is available to split on, and so long as we have labels to split. This means that even weak attributes that do not contribute much to lowering the entropy of the tree will make their way in -- usually as the last attributes to be added. We would like to block these low-value attributes from being added to the tree, as they could mess up classification of the test data. The way we do this is with pruning.
+
+There are several techniques for pruning. Among them is the Chi-Square method, which given a measure of deviance and a \emph{dof} or degrees or freedom value, will give the statistical likelihood of rejecting the null hypothesis that the attribute does not correlate with the previous distribution within the data. 
+
+We modify the ID3 algorithm to include this component: after evaluating the best available attribute on which to split and before actually splitting, we calculate a deviance measure of the data based on the hypothetical attribute choice. Considering each label class at a time and the data coming into a particuar node, we refer to the vectors with the given label as the `positive' examples, and to all other vectors as the `negative' examples. We then calculate the expected numbers of positive and negative examples.
+\begin{eqnarray}
+    \hat{p} = \frac{p_{in}}{p_{in}+n_{in}} \cdot |D|\\
+    \hat{n} = \frac{n_{in}}{p_{in}+n_{in}} \cdot |D|
+\end{eqnarray}
+where $D$ is the data going \emph{out} of the node after splitting on the chosen attribute. We then calculate the deviance:
+\begin{equation}
+    dev(A_i) = \frac{(\hat{p} - p_{out})^2}{\hat{p}} + \frac{(\hat{n} - n_{out})^2}{\hat{n}}
+\end{equation}
+where $p_{out}$ and $n_{out}$ are the true numbers of positive and negative examples after dividing the data by the attribute. Feeding this measure to the chi-square function with degree of freedom equal to $(|C| - 1)(|V_i| - 1) $ ($|C|$ being the number of classes and $|V_i|$ being the number of values of the chosen attribute gives use the probability of rejecting the null hypothesis. Generally speaking, $5\%$ is considered a good statistical value to decide by. So we modify our algorithm to winnow out any attribute nodes for which we cannot disprove the notion that they don't contribute to our data.
 
 \subsection{Genetic Algorithms}
-Here, talk about how genetic algorithms work.  Give the basic algorithm, and
-discuss what needs to be determined (eg. encoding, fitness function, selection
-method, population size, etc.).
+Genetic algorithms work by creating an initial set of possible solutions to a problem, and then mixing and mutating those solutions over time, while choosing the better solutions with a stochastic process. \cite{melanie1999introduction} provides an excellent overview of the stages of a genetic algorithm:
+
+\begin{enumerate}
+    \item Starting with a randomly generated set of $n$ solutions,
+    \item Calculate the \emph{fitness} of each solution
+    \item Using a \emph{selection function}, choose a pair of `parent solutions'. It's important to search with replacement i.e. to allow parents to be chosen again.
+    \item A \emph{crossover probability} $p_c$ determines whether the parents are mutated with each other to form a child pair, or whether they are left intact and proceed to the next generation. \emph{Crossover} is a genetic term for pieces of DNA switching sites between parents, and it's an operation that needs to be supported by the \emph{encoding} of the solutions.
+    \item The parents which produced children are subject to a certain \emph{replacement policy}, whether it be discarding the parents (called simply \emph{replacement}), joining them with the rest of the new generation (called \emph{elitism}) or some other policy.
+    \item The new population is mutated at random using mutation probability $p_m$. 
+    \item Discard the old population and keep the new one. Proceed to step 2.
+\end{enumerate}
+
+The first requirement for genetic algorithms is to find some form of encoding that allows manipulations with the genetic operators (crossover, mutation, fitness function), all while maintaining a valid individual solution to the problem. The next requirements involve filling in all the missing parameters of the algorithm. 
+
+A fitness function should cause selective pressure towards solving the problem, but finding an adequate function that leads towards a solution is often tricky. 
+
+A replacement-based replacement policy discards all the old parents, which can throw out some potentially good solutions, while an elitism-based policy chooses the best of all current trees, which could cause early convergence to an especially fit solution rather than a proper exploration of the search-space.
+
+A selection function/policy determines which solutions are chosen and at what rate. A common-used selection function is \emph{fitness proportionate selection}, which is essentially a roulette-wheel function where each solution is given slots on the wheel based on the ratio of the fitness of the particular solution and the total fitness of every solution combined. Another popular method is using \emph{rank-based selection}, which ranks the solutions according to fitness, and then allocates spots on the roulette wheel based on rank rather than fitness proportion. This means that even solutions with relatively low fitness can still get selected. Finally, \emph{tournament selection} randomly picks a certain number of solutions and then carries out rank selection on that set.
+
+Mutation probabilities are usually very low, in the order of 1\%, since mutation can cause serious drift away from the fitness function. On the other hand, mutation also helps avoid converging to a local maximum in the solution space.
 
 \subsubsection*{Genetic Algorithms for Decision Trees}
-Here, discuss the particulars of your GA.  This should definitely include a
-discussion of your encoding, and how your mutation and crossover functions
-worked on it.  It should also include a discussion of your fitness function,
-your selection method, and any other choices you made when designing your
-algorithm.  It is very important to note that you should not only talk about
-what you chose, but also about how and why you chose it.  This should not
-include how you tuned various parameters that were chosen through
-experimentation; that should come later, and the experiments you used should
-appear in your results section.
 
-What you do need to talk about is the theoretical reasons behind your choices.
-For example, what makes your encoding an appropriate one for this domain?  How
-did that impact the choice of mutation and crossover functions?  How did it
-influence your choice of fitness function?  How did you come up with your
-fitness function and why is it a good one for this task? 
+When applying genetic algorithms to decision trees, a natural choice of encoding is the tree itself. The problem with converting to any other encoding is how to maintain tree correctness once the genetic operators are executed on the trees. Specifically, decision trees must maintain the right number of decision nodes for a given attribute. Using the tree itself as a solution encoding makes the most sense, since construction of the tree enforces its correctness constraints.
+
+After deciding on a proper encoding, several other choices must be made. A fitness function needs to be chosen to serve as the selective pressure on the population. In our case, we did not select a fitness function until experimentation, but we chose a set of three possible fitness functions: precision, recall, and a mix of precision and recall. Given a set of test data $D$ with positive examples (ie. labels in a chosen class $C$), negative examples (labels in other classes), and a classification result with positive predicted labels of the chosen class and predicted labels of other classes, the following table describes the true positive, true negative, false positive and false negative counts:
+
+\begin{center}\begin{tabular}{|c|c|c|c|}
+    \hline
+    & & \multicolumn{2}{|c|}{Real values} \\
+    \cline{3-4}
+           & & Positive & Negative \\ \hline
+    Classified & Positive& $T_p$ & $F_n$ \\ \cline{2-4}
+    values & Negative& $F_p$ & $T_n$ \\ \hline
+\end{tabular}\end{center}
+
+The precision and recall functions are defined as
+\begin{eqnarray}
+    Precision = \frac{T_p}{T_p + F_p}\\
+    Recall = \frac{T_p}{T_p + F_n}
+\end{eqnarray}
+
+Not knowing which of these will be more effective (or a combination of the 2), we implemented all 3 options and tested them out in our experiments. Each of these measures promotes minimizing the errors in the data. We also added a small component to encourage smaller trees (similar to the heuristic used for ID3) by multiplying the tree size by a constant and subtracting that from the fitness of the tree.
+
+The next important choice is that of the mutation and crossover genetic operators. For crossover,we select a node at random out of each tree and swapped the nodes between the trees. This turned out to be an expensive operation, and we used zippers to do it more efficiently (see next section). For mutation, we chose a random subset of the following three operations: 
+
+\begin{enumerate}
+    \item Changing the attribute of a given node. This can only be done between attributes that have the same number of values, or you can violate the decision tree constraint.
+    \item Adding an attribute to a tree at a leaf node, turning that leaf itself into a node. Adding in the middle of the tree is problematic because it's not clear how to populate the subnodes of the new attribute node.
+    \item Removing a node, deleting the sub-tree beneath it.
+\end{enumerate}
+
+We implemented a variety of selection functions: fitness-proportional, rank-based and tournament-based. Rather than deciding up front which one to go with, we used our experiments to find the one that worked best. This applies to other parameters used in the algorithm: replacement function, mutation probability, etc. Rather than decide on values beforehand, we experimented and found the results that seemed to do best. Note that this was by no means a rigorous, statistical selection: we simply chose the parameters that seemed to help the genetic algorithm the most.
+
+\section{Functional Programming}
+Functional programming languages such as OCaml and Haskell are a variation on lambda calculus. Construction a decision tree with functional programming is fairly trivial since most functional languages use Abstract Data Types, which are well suited for trees. Travelling around in the tree involves simply iterating over the nodes and pattern matching on the node attributes and values. Our decision tree representation looked as follows:
+
+\begin{verbatim}
+type attrib_t = int
+type val_t = Node of string * tree_t
+           | Leaf of string * label_t
+and tree_t = attrib_t * val_t list}
+\end{verbatim}
+
+In OCaml, most data types are referentially transparent, which means that one is discouraged form obtaining a pointer and directly modify a node. Data structures are immutable by default, meaning that trees cannot be modified in-place. This, as well as the fact that global pointers (refs) and global state is discouraged, means that functions can often be tested individually, often from the OCaml interpreter's REPL command line. 
+
+At the same time, there are costs to using functional languages. Since data structures are created rather than modified, and since allocation is one of the greatest costs in modern computer systems, functional languages often suffer in their performance. Fortuonately, functional data structures exist that mitigate some of these data modification costs by reusing parts of the old data strucutures and allocating only the changing ones. For example, mutation of our trees required creation of the new mutated nodes, but the old nodes below the mutation point could be reused. 
+
+Another issue we discovered while implementing the genetic algorithm is the cost of modifying a particular node in a tree, particularly when performing crossover. Crossover involves finding two attribute nodes in two parent trees and swapping them. This would seem to be a simple operation, involving copying the trees and then pointer swapping in imperative languages. In functional languages, however, this is an expensive operation. There is no default way to refer to a node in a tree directly and to `implant' that node back in a tree. In order to refer to a node, an integer must be used to refer to the position of the node in some linearization (i.e. traversal) of the tree. The nodes need to be retrieved from the trees by traversing the trees, and then 2 more traversals are needed to recreate the trees. Fortunately, \cite{huet1997functional} invented the `zipper', which allows constant-time traversal of a functional data structure. 
+
+A Zipper is a list structure describing a path from the position in the tree to the root of the tree. Our zipper is defined as follows:
+\begin{verbatim}
+type loc_t = Top 
+        | Path of loc_t * attrib_t * string * val_t list * val_t list
+type zipper_t = loc_t * tree_t
+\end{verbatim}
+
+The first part of the zipper contains the location in the tree using a path loc type, that is either Top (top of the tree) or a Path in the tree, containing the next loc, the attribute and node value of the particular node we're looking (for reconstruction), a list of values left of the current node, and a list of values right of the current node. The second element of the zipper tuple contains the tree below the current node. Since the zipper's path contains lists of values, which themselves contain trees, the zipper is essentially a path to the root with the untaken branches glued along the way.  Using the zipper we can move up, down, left or right in the tree in constant time. We made use of the zipper to get good performance, which was needed for the genetic algorithms.
+
 
 \section{Algorithms and Experimental Methods}
 
@@ -154,13 +261,15 @@ how you implemented it.  It would also be good to discuss the strengths and
 weaknesses of your chosen validation method; why did you pick the one you did?
 
 \subsection*{Data Sets}
-Here you should describe the data you used; where it came from, what it
-represents, what properties it has (eg. binary class? multi class? multi
-variate? continuous? dimensionality? number of examples? etc.).  Talk about all
-the data sets you used.  Be sure to mention and properly cite their source.
+The data sets used were all obtained from \cite{ucimll}. The following sets of data were selected to test with:
+\begin{description}
+    \item[House Voting Data] This set contains 435 examples of votes profiles of congresspeople, and a label of their affiliation, whether it be Republican or Democrat. 16 attributes corresponding to 16 different votes by the same representative are recorded, and for each attribute, the values can be either yes, no or abstain.
+    \item[Monk's Problems Data] These are 3 sets of examples of classification problems that were designed to be tough. Each problem has only 7 attributes with varying numbers of values, but the last attribute is difficult to deal with since it contains hundreds of values. In terms of classes, the 2 options are 0 and 1.
+    \item[Mushroom Data] This set contains 22 attributes with varying cardinalities, but the only 2 classes are `edible' and `poisonous'. There are 8124 examples altogether.
+    \item[Splice Junction] This is a particularly difficult set. 59 attributes have only the values of the possible DNA bases G, C, T and A. An additional attribute gives a specific name, making that attribute have a very large number of values. Altogether there are 3190 examples.
+\end{description}
 
-Also mention how you pre-processed the data, if you did.
-
+Every data set was modified using Vim macros and regex expressions to match the legal input of our program. In particular, the data sets were normalized to have a comma between each attribute/label. For the Splice Junction data, the examples were also pre-shuffled using the UNIX `shuf' command. This is because the classes were lumped together initially, making the test much harder than it needed to be.
 
 \section{Results}
 \begin{figure}
@@ -282,6 +391,7 @@ the middle).
 % the bibliography command should contain the name of your .bib file, minus the
 % extension.
 \bibliography{hw4bib}
+%\printbibliography
 
 % because "document" is an environment, you need to have a closing tag at the
 % end of your document.  Anything written after this tag will not be included in
