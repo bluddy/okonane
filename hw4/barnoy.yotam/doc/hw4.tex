@@ -1,0 +1,289 @@
+% This template was created by Ben Mitchell
+% for the JHU AI class, CS 335/435, spring 2008. 
+
+% Updated spring 2009 by Ben Mitchell.
+
+% For those who want to learn LaTeX, this is a decent place to start:
+% http://en.wikibooks.org/wiki/LaTeX
+% Note that the proper pronunciation is "la tek", not "lay teks".
+%
+% Other references are linked from Mr. Mitchell's JHU CS web page, at
+% www.cs.jhu.edu/~ben/latex/
+%
+% There are lots of latex tutorials and primers online; just be careful with
+% google images.
+
+
+
+
+% the documentclass line says that this is an "article" (as opposed to, eg. a
+% book or a report).  This defines the basic formatting of the document.  The
+% arguments say that we want 12 point font (the default is 10), and 8.5"x11"
+% paper (the default is A4)
+%
+% If we said "report" instead of "article", then the title would be put on a
+% separate title page, rather than at the top of the first page of text, and the
+% numbering would be set up expecting chapters to be the top level divisions,
+% above sections.  Try it out, but be sure to use "article" for your
+% submission.
+\documentclass[12pt, letterpaper]{article}
+
+% the usepackage line states what extra packages we want to use
+% we use several "AMS" packages, which are created and distributed
+% by the American Mathematical Society (AMS), and have a number of useful
+% macros for writing math and equations.
+%
+% the graphicx package is one of several packages that can be used for
+% including images in a LaTeX document
+\usepackage{amsmath, amsthm, graphicx}
+
+
+% the title should contain your title.  Note the "\\"; this causes a linebreak.
+% By default, LaTeX ignores extra whitespace, including single linebreaks.
+% If you leave a blank line inbetween two blocks of text, that is interpreted as
+% a paragraph break.
+\title{Genetic and ID3 Decision Trees:\\ A functional approach}
+
+% Put your name in the author field
+\author{Yotam Barnoy}
+
+% this begins the actual text of the document; everything before this is
+% refered to as "preamble"
+\begin{document}
+
+% the maketitle command formats and inserts the title, author name, and date
+\maketitle
+
+\begin{abstract}
+Decision trees are a widely used tool in Machine Learning, as are genetic algorithms. We compare the accuracy and performance of two methods of producing decision trees: the well known ID3 algorithm, and genetic algorithms. We implement both methods using OCaml -- a functional language. We conclude that both algorithms are suited for different purposes, with ID3 being sufficient for simple data sets.
+
+\end{abstract}
+
+\section{Introduction}
+Decision Trees have found uses in a wide range of fields, from car-manual repair instructions to operations research. Much of their value comes from their simplicity --- at each node in the decision tree, several options are presented in the form of the node's children, and so, starting from the complete space of the decision tree and descending to a particular sub-set represented by the leaf involves only evaluating simple comparison operations and following the node ordering.
+
+Within the field of Machine Learning, decision trees are a widely used method for classification\cite{tomMitchellML}. Constructing optimal decision trees, however, is not a simple problem to solve\cite{decisionTreesNPComplete}. A commonly used heuristic is to try and make the decision tree as small as possible, while still attaining a good measure of accuracy. This heuristic, which follows the principle of Occam's Razor, was formalized by Rissanen\cite{rissanen1978modeling}, and it is at the heart of the Quinlan's ID3 algorithm\cite{quinlan1986induction}.
+
+Many approaches have been suggested for the creation of optimal decision trees. \cite{safavian1991survey} presents a thorough survey of approaches to the subject. In this paper, we focus on two primary approaches: the ID3 algorithm, and genetic algorithms.
+
+Genetic algorithms are --- much like Artificial Neural Networks --- inspired by a natural process, specically, evolution. This idea originated in the 1950s and 1960s, when Rechenberg(1965) introduced the concept of ``evolution strategies''\cite{melanie1999introduction}. It was made concrete by John Holland, who invented ``Genetic Algorithms'', per se\cite{holland197388}. Similarly to the way that Natural Selection selects from a group of organisms the sub-group that is most `fit', with fitness being a relative term, so too, Genetic Algorithms select from a set of solutions the ones most `fit', according to a certain measure of fitness known as the fitness function. Over time, a selective pressure causes the population to conform to the requirements of the fitness function, which is usually tuned to encourage a proper solution to the given problem.
+
+The aforementioned ID3\cite{quinlan1986induction} algorithm uses a greedy strategy to attempt to create the smallest tree possible on an iterative basis. At each split of the tree, the best attribute for the next node is selected, until either all data is consumed or no more splitting of the tree is possible.
+
+This paper compares the performance of the ID3 algorithm to a genetic algorithm approach to creating decision trees. Since genetic algorithms require many parameters to work, a comparison is also made between different genetic algorithm parameters and how they affect their results. While these algorithms aren't novel, we shall attempt to study the effects of modifying different parameters, and how the different algorithms stack up when measured on different data sets. 
+
+For our experiments, the implementation of both algorithms was carried out in Ocaml, which is an heir to a long line of functional languages, starting with Lisp\cite{hudak1989conception}. Functional Languages lack the implicit state that imperative languages possess, requiring it to be strung along explicityly. They are declarative in nature, representing a somewhat modified form of the lambda calculus, as formulated by Alonzo Church. The big advantage of functional programming over imperative programming is the limitation of mutable state, which may be seen as a confounding factor in writing code. The disadvantages include performance challenges and debugging facilities, which will be addressed in this paper.
+
+Section 2 of this paper details the theoretical underpinnings for the algorithm. Section 3 describes the challenges of using a functional language to implement decision try algorithms and how they were addressed. Section 4 details the algorithm and our experiments, while section 5 lists the results of the experiments. Finally, section 6 analyzes the results and suggests possible future work in the field.
+
+\section{Learning Decision Trees}
+Like many supervised learning algorithms, decision trees are learned using a training phase followed by a test, or classification phase. Classical decision tree methods can only be applied to discrete-valued problems: problems where input attributes have a finite number of discrete values. 
+
+Consider a data set $D$ with $n$ attributes $A_i$ ranging from $A_1, A_2, A_3 \dots A_n$. Each attribute can have possible values $v_{ij}$, with $j$ ranging from $1\dots m_i$ where $m_i = |A_i|$. A vector $U$ contains an ordered sequence of values $v_{ij}$ as in $v_{1j}, v_{2j}\dots v_{nj}$. Additionally, if the data can be classified into $c$ classes, a labeled vector contains a label $l_k$ in the range $l_1\dots l_c$. 
+
+The task of a classification algorithm is to find patterns in a set of labeled vectors (one containing a label), and then proceed to assign labels to unlabeled vectors. The first part of this process is referred to as training phase and the second as testing, or classification phase.
+
+Decision trees codify a certain pattern in the data. As piece-wise functions with discrete inputs, they represent an arbitrarily complex conditional expression over the values of the data. 
+
+Practically speaking, implementing decision trees usually involves using whatever method the programming language possesses to describe a tree data structure. In C, this will involve pointers and structures, whereas a more object-oriented language will use a class-based approach. In OCaml, as in other functional languages, the natural method to describe trees is with ADTs, or \emph{Abstract Data Types}. We will examine this in more detail in section 3. Regardless, every member of a tree $T$ can be either an internal node or a leaf. An internal node of $T$ consists of an attribute $A_i$ possessing exactly $m_i$ children. Each child corresponds to a value $v_{ij}$ of the attribute $A_i$, and each child can be either another internal node or a leaf. Leaf nodes consist only of the value $v_{ij}$ they represent, and the label attached to them, $l_k$.
+
+After building a tree in the training phase, the way a label is chosen for a specific test vector is by following the nodes in the tree from the root of the tree down until a leaf node is reached. At every juncture in the tree, a value $v_ij$ is chosen corresponding to the value of attribute $A_i$ in the test vector. The choice determines the path to take. Once a leaf is reached, it serves as the predicted label for that test vector.
+
+TODO: insert tree here
+
+\subsection{Traditional Methods}
+The traditional method of building decision trees is a greedy algorithm known as ID3 (Iterative Dichotomiser 3)\cite{quinlan1986induction}. This algorithm consists of the following steps:
+
+Given data $D$ consisting of labeled vectors as described above, and a list of remaining attributes $A_1\dots A_n$:
+
+\begin{enumerate}
+    \item If there are no attributes left to split on, form a leaf with the majority label among the remaining vectors.
+    \item If the vectors contain only one label class $l_k$, form a leaf with that label.
+    \item Otherwise, find the best remaining attribute $A_i$ on which to split the data. Create a node for $A_i$ and children for every value $v_{ij}$.
+    \item Iterate over each child, passing only the vectors that contain $v_{ij}$ and a reduced list of remaining attributes.
+\end{enumerate}
+
+This algorithm is greedy since it cannot reason about the future: it cannot choose to split over a weaker attribute so that it may split more effectively later on.
+Of course, the tricky part is finding a heuristic with which to decide which node is the best node to split on. This is the real insight of ID3.
+
+% note the '*' character; this causes  a (sub)section to not be numbered.
+\subsubsection*{Entropy and Information Gain}
+
+
+
+Here, talk about the maximum information gain heuristic.  You should both give
+an intuitive feel for what it does and give the mathematics and theory behind
+it.  You should also discuss why it tends to work well for decision trees, and
+what strengths and weaknesses it has.  This should lead you into a discussion of
+gain ratio, which you can then define and contrast to straight information gain.
+
+\subsection{Genetic Algorithms}
+Here, talk about how genetic algorithms work.  Give the basic algorithm, and
+discuss what needs to be determined (eg. encoding, fitness function, selection
+method, population size, etc.).
+
+\subsubsection*{Genetic Algorithms for Decision Trees}
+Here, discuss the particulars of your GA.  This should definitely include a
+discussion of your encoding, and how your mutation and crossover functions
+worked on it.  It should also include a discussion of your fitness function,
+your selection method, and any other choices you made when designing your
+algorithm.  It is very important to note that you should not only talk about
+what you chose, but also about how and why you chose it.  This should not
+include how you tuned various parameters that were chosen through
+experimentation; that should come later, and the experiments you used should
+appear in your results section.
+
+What you do need to talk about is the theoretical reasons behind your choices.
+For example, what makes your encoding an appropriate one for this domain?  How
+did that impact the choice of mutation and crossover functions?  How did it
+influence your choice of fitness function?  How did you come up with your
+fitness function and why is it a good one for this task? 
+
+\section{Algorithms and Experimental Methods}
+
+In this section, you describe any details of your algorithm that you left out of
+the more theoretical discussion in the previous section.  You don't need to list
+every single parameter value, but ones that are important to your results should
+be discussed (eg. don't just list them, talk about why they have that value).
+
+You should also describe your experimental methodology; this is where you talk
+about your data and what you did with it.  Talk about what sorts of experiments
+you performed, and how you validated them.  For example, if you used 7-fold
+cross-validation, you would say that you used it, define what it is, and discuss
+how you implemented it.  It would also be good to discuss the strengths and
+weaknesses of your chosen validation method; why did you pick the one you did?
+
+\subsection*{Data Sets}
+Here you should describe the data you used; where it came from, what it
+represents, what properties it has (eg. binary class? multi class? multi
+variate? continuous? dimensionality? number of examples? etc.).  Talk about all
+the data sets you used.  Be sure to mention and properly cite their source.
+
+Also mention how you pre-processed the data, if you did.
+
+
+\section{Results}
+\begin{figure}
+\begin{center}
+\includegraphics[width=2.5in]{images/konane1.pdf}
+\end{center}
+\caption{This is a caption on the figure}
+\label{somefigure}
+\end{figure}
+
+\begin{table}
+\begin{center}
+\begin{tabular}{|c||c|cc}
+\hline
+& col1 & col2 & col3\\
+\hline \hline
+row1 & a & b & c\\
+\hline 
+row2 & d & e & f\\
+\hline 
+\end{tabular}
+\end{center}
+\caption{This is a caption on the table}
+\label{sometable}
+\end{table}
+
+The results section should contain your results.  It should \emph{not} contain
+your interpretation of those results.  That comes later.  This section should be
+made up primarily of graphs and tables that show your data.  You should also
+have a small amount of text describing what each of the tables and graphs shows,
+since the caption on the figures should be short.  Having text describing the
+specifics of the experiment that lead to that particular table would also be
+good.  For example,
+
+\begin{quote}
+``Table \ref{sometable} shows the average results of the three algorithms on all
+the data sets.  The parameters used were $N=7$, and $k=3.27$; these parameters
+were found by hand, and little effort was made to tune them optimally.  Each
+algorithm was run three times on each of the seven data sets, and the resulting
+accuracy scores were averaged.''
+\end{quote}
+
+I'm not going to tell you exactly what tables or graphs you should have here,
+since it will depend a bit on your results.  You should be sure that your
+results section contains sufficient data to support your conclusions about the
+relative strengths and weaknesses of the different algorithms.  You should also
+be sure that your data is complete; that is, don't leave data out simply because
+it doesn't support the point you're trying to make.
+
+You should also be sure that your results are clear and interpretable.  Seven
+pages of raw binary data will do nothing to edify your reader.  Similarly, a
+1 inch square graph with 12 lines plotted on it will be difficult to extract
+meaning from, as will a graph with poor (or no) labels on the axes.  Your
+results should be legible both on screen and in hard copy.
+
+You don't want to present results that are just raw data, since that is hard to
+interpret.  But you don't want to over abstract, either, since that leads to
+results that have little or no meaning (eg. ``the average over all different
+data sets, algorithms, and parameters'' is a completely useless statistic for
+comparing algorithms).
+
+You should have several pages of results; one or two tables are unlikely to be
+sufficient to describe your experiments.  If they are, you need to do more
+experiments.
+
+\section{Discussion}
+The discussion section is where you discuss your interpretation of the data you
+presented in the results section.  This is where you tell the reader how great
+your algorithm is, and how interesting it is that \emph{this} performed better
+than \emph{that} on some given data set.  You can also speculate about causes
+for interesting behaviors; for example, if you think you might know why it fails
+so badly on some particular case, or if you have an insight into why it did well
+on another case.  You don't want to be making wild guesses, but as long as you
+make it clear that you are not making claims of factual proof, you can go out on
+a limb a little.  For example,
+
+\begin{quote}
+``In most cases, algorithm A outperforms algorithm B with a significance of
+99.8\%.  However, as can be seen from Figure \ref{somefigure}, when applied to
+the ``E. E. Smith'' data set, algorithm A does no better than random chance.  It
+seems likely that the failure of algorithm A to learn is due to the extremely
+sparse distribution of that data set.  Because of algorithm A's heavy reliance
+on data being densely sampled from the true underlying distribution, any sparse
+data set is likely to show this behavior.''
+\end{quote}
+
+\section{Conclusions}
+The conclusion section should be relatively short, and should not be a summary
+of your paper.  It should, however, bring up what you learned and what impact
+your results have on the rest of the field (and society as a
+whole, if applicable).  You should conclude, and bring your paper to an  end
+with any parting thoughts that are appropriate.
+
+Certain types of papers can be ended with a ``Summary'' section instead of a
+``Conclusions'' section, in which case you would, in fact, summarize the main
+points of your paper.  For this paper, you should write a Conclusions section,
+not a Summary.
+
+Conclusion also often contain information about what else you would like
+to do.  Sometimes this is a separate subsection, or even a section, entitled
+``Future Work.''  The basic idea here is to talk about what the next steps to
+take would be.  This is of benefit to others who are interested in your
+work and may want to help advance it.  It is also a chance for you to
+acknowledge shortcomings in your work; since we never have infinite time to
+prepare a paper, there are always more experiments that would have been nice to
+include.  If you list them as future work, then it at least makes it clear that
+you didn't do those things because you didn't have time, rather than because you
+didn't realise that they were important to do.
+
+In your paper, you should include a brief discussion of avenues for possible
+future work in your Conclusions section.  It should be tied in with the rest of
+your conclusion, and should not be an unrelated section tacked on the end (or
+the middle).
+
+% many different styles of bibliography are available; plain is fine for this
+% assignment
+\bibliographystyle{plain}
+
+% the bibliography command should contain the name of your .bib file, minus the
+% extension.
+\bibliography{hw4bib}
+
+% because "document" is an environment, you need to have a closing tag at the
+% end of your document.  Anything written after this tag will not be included in
+% the generated output.
+\end{document}
