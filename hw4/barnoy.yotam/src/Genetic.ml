@@ -115,22 +115,33 @@ let eval_fitness_all fitness_fn filter_p data (trees:fit_tree_t list) =
     ) 
     [] trees
 
+(* get the avg fitness of a whole population *)
+let avg_fitness pop =
+  let total_fit, num = List.fold_left (fun (acc, i) (mf,_) ->
+      match mf with None -> failwith "missing fitness" | Some f ->
+      (acc +. f, i+1)
+    )
+    (0., 0)
+    pop in
+  total_fit /. (foi num)
+
 (* Selection functions ------ *)
 (* fitness proportionate function *)
 let fitprop_fn _ num pop =
   (*print_endline "in fitprop";*)
   let total_fitness, acc_pop = List.fold_left (fun (sum, acc) ((mfit, _) as t) ->
       match mfit with None -> failwith "missing fitness" | Some fit ->
-      sum +. fit, (sum, t)::acc)
+      sum +. fit, (sum +. fit, t)::acc)
     (0.,[]) 
     pop in
   let pop' = List.rev acc_pop in
   (*List.iter (fun (i,_) -> Printf.printf "%f " i) pop'; print_newline ();*)
-  (*Printf.printf "%f\n" total_fitness; print_newline ();*)
+  (*Printf.printf "total: %f\n" total_fitness; print_newline ();*)
   let pop_arr = Array.of_list pop' in (* array for bin search *)
   (* pick with replacement *)
   let res = snd @: iterate_until (fun (j,acc) -> 
       let rand = Random.float total_fitness in
+      (*Printf.printf "rand: %f" rand;*)
       match binary_search pop_arr fst rand with 
       | Found x | NotPresent x ->
         let _, t = pop_arr.(x) in
@@ -147,9 +158,11 @@ let rank_fn _ num pop =
   (* add up rank in one go *)
   let add,total_rank', acc_pop = List.fold_left (fun (add, sum, acc) t ->
       add + 1, sum + add, (sum, t)::acc)
-    (1,0,[]) 
+    (2,0,[]) 
     sorted_pop in
   let total_rank = total_rank' - add + 1 in (* correct for too much adding *)
+  List.iter (fun (i,_) -> Printf.printf "%d " i) acc_pop; print_newline ();
+  Printf.printf "total: %i\n" total_rank; print_newline ();
   let pop_arr = Array.of_list (List.rev acc_pop) in (* array for bin search *)
   (* pick with replacement *)
   snd @: iterate_until (fun (j,acc) -> 
@@ -346,8 +359,10 @@ let genetic_run params (data:vector_t list) =
       mutate_all labels values attrib_sets p.mutation_p new_gen in
     let new_gen_f = (add_fitness mutated)@rest in
     (* do different things depending on our termination criterion *)
-    if !debug then (Printf.printf "best: %f" (fst @: best_fitness new_gen_f); print_newline ());
-    match p.termination, old_fitness with
+    if !debug then 
+      (Printf.printf "best: %f, avg: %f" 
+        (fst @: best_fitness new_gen_f) (avg_fitness new_gen_f); print_newline ()); 
+      match p.termination, old_fitness with
       | Generations g, _ when gen >= g  -> best_fitness new_gen_f
       | Generations(g), _ -> loop new_gen_f (gen + 1) old_fitness
       (* if we're going by delta, check if enough gens have passes since a large

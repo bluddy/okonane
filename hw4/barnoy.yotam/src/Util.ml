@@ -249,7 +249,8 @@ let matrix_of_lists l =
 
 type 'a bin_search_t = Found of int | NotPresent of int
 
-(* do a binary search over an array *)
+(* do a binary search over an array. Search for a value greater than the one
+ * we're looking for *)
 (* requires an ascending list *)
 let rec binary_search a fn value : 'a bin_search_t =
   let len = Array.length a in
@@ -258,6 +259,7 @@ let rec binary_search a fn value : 'a bin_search_t =
     (*Printf.printf "low: %d high: %d" low high; print_newline ();*)
     if high = low then
       if fn (a.(low)) = value then Found low
+      else if fn(a.(low)) < value && low < len - 1 then NotPresent(low+1)
       else NotPresent low
     else let mid = (low + high) / 2 in
       if fn(a.(mid)) > value then
