@@ -57,7 +57,7 @@
 \maketitle
 
 \begin{abstract}
-Decision trees are a widely used tool in Machine Learning, as are genetic algorithms. We compare the accuracy and performance of two methods of producing decision trees: the well known ID3 algorithm, and genetic algorithms. We implement both methods using OCaml -- a functional language. We conclude that both algorithms are suited for different purposes, with ID3 being sufficient for simple data sets.
+Decision trees are a widely used tool in Machine Learning, as are genetic algorithms. We compare the accuracy and performance of two methods of producing decision trees: the well known ID3 algorithm, and genetic algorithms. We also compare various parameters that the genetic algorithm approach uses. We implement both methods using OCaml -- a functional language. We conclude that both algorithms are suited for different purposes, with ID3 being sufficient for simple data sets.
 
 \end{abstract}
 
@@ -248,6 +248,25 @@ The first part of the zipper contains the location in the tree using a path loc 
 
 \section{Algorithms and Experimental Methods}
 
+We had several ways to judge the performance of the different algorithms. Our program spits out accuracy, precision and recall statistics per fold, as well as a confusion matrix. We settled on accuracy as the primary method of comparing different runs of the algorithms. Ultimately, accuracy is what one cares about most when classifying data. Certainly a plane manufacturer would have a different opinion on the matter when it comes to testing his planes, but for us, accuracy was good enough. The other data was useful for additional analysis, but it wasn't our deciding factor. 
+
+Every experiment involved 8-fold cross-validation, i.e. we divided the data set into 8 folds or chunks, and then iterated through the fold combinations, choosing one to test on and the rest with which to train. We initially tried 10-fold cross-validation but that seemed like it was driving the example counts too far down per fold, so we scaled back to 8-fold cross-validation.
+
+K-fold cross-validation is a good way to get a lot of use out of a limited amount of data. By iterating and using different sub-sets of the data for testing and training data, we can get many different results, allowing us to have statistically meaningful data. K-fold cross-validation is much more useful than 2-fold cross-validation (holdout), but it isn't as useful as Leave-one-out cross-validation, which just isn't realistic given the training time of especially the genetic algorithms. Given our constraints, k-fold cross-validation seemed like the right way to go.
+
+For all experiments, we took the mean and standard deviation of all runs. However, we performed statistical analysis (a T-Test) only for one experiment --- the comparison between ID3 and GAs. The rest was done by estimation.
+
+We performed several sets of experiments. The default parameters for genetic algorithms were set to a population of 100, with 400 generations, a precision fitness function, full replacement policy, fitness-proportionate selection, with a mutation probabilty of $1\%$ and a crossover probability of $40\%$. We then tested different combinations:
+
+\begin{enumerate}
+    \item We compared different fitness functions: recall, precision and a mixed function, keeping all other parameters equal. We used the winning parameter for our comparison against ID3.
+    \item We compared different filter probabilities: if each generation trains on a random subset of the data, how does that affect accuracy? How does it affect the processing time?
+    \item We compared different selection criteria and their effect on accuracy.
+    \item We compared different replacement functions and their effect on accuracy.
+    \item We compared the accuracies of different ID3 parameters: using information gain, information gain ratio, and information gain with chi-square pruning, and information gain ratio with chi-square pruning.
+    \item We compared the best version of genetic algorithms to the best version of ID3 and ran a statistical T-test on the results. We also compared execution times.
+\end{enumerate}
+
 In this section, you describe any details of your algorithm that you left out of
 the more theoretical discussion in the previous section.  You don't need to list
 every single parameter value, but ones that are important to your results should
@@ -269,120 +288,141 @@ The data sets used were all obtained from \cite{ucimll}. The following sets of d
     \item[Splice Junction] This is a particularly difficult set. 59 attributes have only the values of the possible DNA bases G, C, T and A. An additional attribute gives a specific name, making that attribute have a very large number of values. Altogether there are 3190 examples.
 \end{description}
 
+Any set that had separate training and test data had those two sections joined together, since we do k-fold cross-validation.
+
 Every data set was modified using Vim macros and regex expressions to match the legal input of our program. In particular, the data sets were normalized to have a comma between each attribute/label. For the Splice Junction data, the examples were also pre-shuffled using the UNIX `shuf' command. This is because the classes were lumped together initially, making the test much harder than it needed to be.
 
 \section{Results}
-\begin{figure}
-\begin{center}
-\includegraphics[width=2.5in]{images/konane1.pdf}
-\end{center}
-\caption{This is a caption on the figure}
-\label{somefigure}
-\end{figure}
 
-\begin{table}
+The results of the first experiment can be observed in table \ref{tab:fitness}. We used the same parameters (as listed in the previous section) with the exception of the fitness function. Interestingly, recall was the superior fitness function for all but the splice dataset.
+
+\begin{table}[htbp]
+\caption{Comparison of GAs with different fitness functions}
 \begin{center}
-\begin{tabular}{|c||c|cc}
+\begin{tabular}{|l|l|r|r|r|r|r|r|}
 \hline
-& col1 & col2 & col3\\
-\hline \hline
-row1 & a & b & c\\
-\hline 
-row2 & d & e & f\\
-\hline 
+\textbf{Fitness} & \textbf{Measure} & \textbf{House} & \textbf{Monks-1} & \textbf{Monks-2} & \textbf{Monks-3} & \multicolumn{1}{l|}{\textbf{Mush}} & \multicolumn{1}{l|}{\textbf{Splice}} \\ \hline
+Prec & Avg & 0.93 & 0.743 & 0.464 & 0.806 & 0.752 & 0.492 \\ \cline{2-7}
+ & Std Div & 0.04 & 0.17 & 0.1 & 0.164 & 0.252 & 0.068 \\ \hline
+ Recall & Avg & 0.95 & 0.714 & 0.657 & 0.823 & 0.856 & 0.496 \\ \cline{2-7}
+ & Std Div & 0.038 & 0.144 & 0.089 & 0.133 & 0.173 & 0.083 \\ \hline
+ Mixed & Avg & 0.93 & 0.747 & 0.626 & 0.818 & 0.887 & 0.502 \\ \cline{2-7}
+ & Std Div & 0.055 & 0.172 & 0.123 & 0.129 & 0.14 & 0.089 \\ \hline
 \end{tabular}
 \end{center}
-\caption{This is a caption on the table}
-\label{sometable}
+\label{tab:fitness}
 \end{table}
 
-The results section should contain your results.  It should \emph{not} contain
-your interpretation of those results.  That comes later.  This section should be
-made up primarily of graphs and tables that show your data.  You should also
-have a small amount of text describing what each of the tables and graphs shows,
-since the caption on the figures should be short.  Having text describing the
-specifics of the experiment that lead to that particular table would also be
-good.  For example,
+The second parameter with which we played is the filter probability. The results can be seen in table \ref{tab:filter}.
 
-\begin{quote}
-``Table \ref{sometable} shows the average results of the three algorithms on all
-the data sets.  The parameters used were $N=7$, and $k=3.27$; these parameters
-were found by hand, and little effort was made to tune them optimally.  Each
-algorithm was run three times on each of the seven data sets, and the resulting
-accuracy scores were averaged.''
-\end{quote}
+\begin{table}[htbp]
+\caption{Comparison of GAs with different filter probabilities}
+\begin{tabular}{|l|l|r|r|r|r|r|r|}
+\hline
+\textbf{Filter} & \textbf{Measure} & \multicolumn{1}{l|}{\textbf{House}} & \multicolumn{1}{l|}{\textbf{Monks-1}} & \multicolumn{1}{l|}{\textbf{Monks-2}} & \multicolumn{1}{l|}{\textbf{Monks-3}} & \multicolumn{1}{l|}{\textbf{Mush}} & \multicolumn{1}{l|}{\textbf{Splice}} \\ \hline
+\multicolumn{1}{|r|}{0.6} & Avg & 0.9 & 0.747 & 0.466 & 0.751 & 0.777 & 0.529 \\ \cline{2-8}
+& Std Div & 0.048 & 0.172 & 0.045 & 0.146 & 0.282 & 0.069 \\ \cline{2-8}
+ & Time (s) & 11.9 & 25.5 & 49.1 & 23.9 & 318 & 130 \\ \hline
+ \multicolumn{1}{|r|}{1} & Avg & 0.93 & 0.743 & 0.464 & 0.806 & 0.752 & 0.492 \\ \cline{2-8}
+ & Std Div & 0.04 & 0.17 & 0.1 & 0.164 & 0.252 & 0.068 \\ \cline{2-8}
+ & Time (s) & 0.058 & 50 & 50 & 35.2 & 532 & 234 \\ \hline
+\end{tabular}
+\label{tab:filter}
+\end{table}
 
-I'm not going to tell you exactly what tables or graphs you should have here,
-since it will depend a bit on your results.  You should be sure that your
-results section contains sufficient data to support your conclusions about the
-relative strengths and weaknesses of the different algorithms.  You should also
-be sure that your data is complete; that is, don't leave data out simply because
-it doesn't support the point you're trying to make.
+Comparing the different selection functions, we obtained the results in table \ref{tab:selection}.
 
-You should also be sure that your results are clear and interpretable.  Seven
-pages of raw binary data will do nothing to edify your reader.  Similarly, a
-1 inch square graph with 12 lines plotted on it will be difficult to extract
-meaning from, as will a graph with poor (or no) labels on the axes.  Your
-results should be legible both on screen and in hard copy.
+\begin{table}[htbp]
+\caption{Comparison of GAs with different selection functions}
+\begin{center}
+\begin{tabular}{|l|l|r|r|r|r|r|r|}
+\hline
+\textbf{Selection} & \textbf{Measure} & \multicolumn{1}{l|}{\textbf{House}} & \multicolumn{1}{l|}{\textbf{Monks-1}} & \multicolumn{1}{l|}{\textbf{Monks-2}} & \multicolumn{1}{l|}{\textbf{Monks-3}} & \multicolumn{1}{l|}{\textbf{Mush}} & \multicolumn{1}{l|}{\textbf{Splice}} \\ \hline
+Fitness & Avg & 0.93 & 0.743 & 0.464 & 0.806 & 0.752 & 0.492 \\ \cline{2-8}
+Proportionate & Std Div & 0.04 & 0.17 & 0.1 & 0.164 & 0.252 & 0.068 \\ \hline
+Rank-based & Avg & 0.952 & 0.747 & 0.454 & 0.79 & \multicolumn{1}{l|}{-} & 0.58 \\ \cline{2-8}
+ & Std Div & 0.031 & 0.172 & 0.093 & 0.125 & \multicolumn{1}{l|}{-} & 0.051 \\ \hline
+ Tournament & Avg & 0.952 & 0.747 & 0.424 & 0.793 & 0.878 & 0.602 \\ \cline{2-8}
+ & Std Div & 0.032 & 0.172 & 0.108 & 0.131 & 0.106 & 0.059 \\ \hline
+\end{tabular}
+\end{center}
+\label{tab:selection}
+\end{table}
 
-You don't want to present results that are just raw data, since that is hard to
-interpret.  But you don't want to over abstract, either, since that leads to
-results that have little or no meaning (eg. ``the average over all different
-data sets, algorithms, and parameters'' is a completely useless statistic for
-comparing algorithms).
+We ran an experiment comparing different replacement functions, and the results can be viewed in table \ref{tab:replacement}.
 
-You should have several pages of results; one or two tables are unlikely to be
-sufficient to describe your experiments.  If they are, you need to do more
-experiments.
+\begin{table}[htbp]
+\caption{Comparison of GAs with different replacement functions}
+\begin{center}
+\begin{tabular}{|l|l|r|r|r|r|r|r|}
+\hline
+\textbf{Replace fn} & \textbf{Measure} & \multicolumn{1}{l|}{\textbf{House}} & \multicolumn{1}{l|}{\textbf{Monks-1}} & \multicolumn{1}{l|}{\textbf{Monks-2}} & \multicolumn{1}{l|}{\textbf{Monks-3}} & \multicolumn{1}{l|}{\textbf{Mush}} & \multicolumn{1}{l|}{\textbf{Splice}} \\ \hline
+Elitism & Avg & 0.95 & 0.742 & 0.491 & 0.768 & 0.757 & 0.502 \\ \cline{2-8}
+ & Std Div & 0.03 & 0.181 & 0.123 & 0.11 & 0.226 & 0.089 \\ \hline
+ Replacement & Avg & 0.93 & 0.743 & 0.464 & 0.806 & 0.752 & 0.492 \\ \cline{2-8}
+ & Std Div & 0.04 & 0.17 & 0.1 & 0.164 & 0.252 & 0.068 \\ \hline
+\end{tabular}
+\end{center}
+\label{tab:replacement}
+\end{table}
+
+We compared all possible variations of ID3 algorithms with different parameters, as can be seen in table \ref{tab:id3}.
+
+\begin{table}[htbp]
+\caption{Comparison of ID3 parameters}
+\begin{tabular}{|l|l|r|r|r|r|r|r|}
+\hline
+\textbf{Method} & \textbf{Measure} & \multicolumn{1}{l|}{\textbf{House}} & \multicolumn{1}{l|}{\textbf{Monks-1}} & \multicolumn{1}{l|}{\textbf{Monks-2}} & \multicolumn{1}{l|}{\textbf{Monks-3}} & \multicolumn{1}{l|}{\textbf{Mush}} & \multicolumn{1}{l|}{\textbf{Splice}} \\ \hline
+Information & Avg & 0.947 & 0.721 & 0.87 & 0.645 & 1 & 0.49 \\ \cline{2-8}
+Gain & Std Div & 0.028 & 0.209 & 0.096 & 0.22 & 0.001 & 0.105 \\ \hline
+Gain & Avg & 0.945 & 0.685 & 0.87 & 0.946 & 1 & 0.908 \\ \cline{2-8}
+Ratio & Std Div & 0.026 & 0.204 & 0.096 & 0.045 & 0 & 0.008 \\ \hline
+Chi-Square & Avg & 0.957 & 0.721 & 0.87 & 0.645 & 1 & 0.519 \\ \cline{2-8}
+ & Std Div & 0.02 & 0.21 & 0.096 & 0.22 & 0.001 & 0.03 \\ \hline
+ Chi-Square & Avg & 0.954 & 0.602 & 0.87 & 0.982 & 1 & 0.857 \\ \cline{2-8}
+w/ GR & Std Div & 0.018 & 0.1 & 0.096 & 0.028 & 0 & 0.011 \\ \hline
+\end{tabular}
+\label{tab:id3}
+\end{table}
+
+And finally, the best GA vs. the best ID3 version:
+
+\begin{table}[htbp]
+\caption{Comparison of the best GA with the best ID3}
+\begin{center}
+\begin{tabular}{|l|l|r|r|r|r|r|r|}
+\hline
+\textbf{Replace fn} & \textbf{Measure} & \multicolumn{1}{l|}{\textbf{House}} & \multicolumn{1}{l|}{\textbf{Monks-1}} & \multicolumn{1}{l|}{\textbf{Monks-2}} & \multicolumn{1}{l|}{\textbf{Monks-3}} & \multicolumn{1}{l|}{\textbf{Mush}} & \multicolumn{1}{l|}{\textbf{Splice}} \\ \hline
+ID3 & Avg & 0.945 & 0.685 & 0.87 & 0.946 & 1 & 0.908 \\ \hline
+ & Std Div & 0.026 & 0.204 & 0.096 & 0.045 & 0 & 0.008 \\ \hline
+ & Time & 0.062 & 0.083 & 0.125 & 0.083 & 1.08 & 5.48 \\ \hline
+GA & Avg & 0.95 & 0.624 & 0.657 & 0.688 & 0.831 & 0.488 \\ \hline
+ & Std Div & 0.039 & 0.2 & 0.089 & 0.117 & 0.162 & 0.114 \\ \hline
+ & Time & 18.1 & 30.8 & 33.6 & 30.7 & 507 & 211 \\ \hline
+\end{tabular}
+\end{center}
+\label{id3ga}
+\end{table}
 
 \section{Discussion}
-The discussion section is where you discuss your interpretation of the data you
-presented in the results section.  This is where you tell the reader how great
-your algorithm is, and how interesting it is that \emph{this} performed better
-than \emph{that} on some given data set.  You can also speculate about causes
-for interesting behaviors; for example, if you think you might know why it fails
-so badly on some particular case, or if you have an insight into why it did well
-on another case.  You don't want to be making wild guesses, but as long as you
-make it clear that you are not making claims of factual proof, you can go out on
-a limb a little.  For example,
 
-\begin{quote}
-``In most cases, algorithm A outperforms algorithm B with a significance of
-99.8\%.  However, as can be seen from Figure \ref{somefigure}, when applied to
-the ``E. E. Smith'' data set, algorithm A does no better than random chance.  It
-seems likely that the failure of algorithm A to learn is due to the extremely
-sparse distribution of that data set.  Because of algorithm A's heavy reliance
-on data being densely sampled from the true underlying distribution, any sparse
-data set is likely to show this behavior.''
-\end{quote}
+Interestingly, the genetic algorithms perform rather poorly on most data sets. This was a complete surprise, as we had expected the effectiveness of genetic algorithms to be proportionate to their running time (or the amount of time needed to implement them properly)  --- clearly, we were mistaken. 
+
+Table \ref{tab:fitness} indicates that different fitness functions had little effect in making the genetic algorithm perform better. It appears that recall does a little better than both precision and the mixed fitness function. It achieves better average accuracy with a lower spread. 
+We see in table \ref{tab:filter} that using a filter probability (training on only a random sample of the data at each generation) doesn't seem to harm the accuracy of the algorithm by much, if at all. In fact, some data sets did better with a filter. More significantly, the time taken to perform the algorithm is greatly reduced for large data sets (such as the muchroom data -- a 40\% reduction!).  
+From the results in table \ref{tab:selction} it appears that rank-based selection does better on these data sets than other selection criteria, but only slightly so. Different replacement functions also seem to have very little effect on accuracy, though replacement has a slight edge over elitism in our tests.
+
+On the ID3 side, in table \ref{tab:id3} it appears that no parameter covers every data set. Every algorithm variation has done well with the House data set, but the Monks data sets are clearly more challenging. However, while the GAs struggle with the Monks-3 dataset, the Gain-Ratio variations of ID3 do very well with it, probably because gain ratio eliminates the dominance of the last attribute in that set, which contains many values. Interestingly, all ID3 algorithms do spectacularly well with the Mushroom set, while the GR-based versions even do well on the splice set. Intresetingly enough, it appears that for these data sets, the non-Chi-Square GR version is the most effective.
+
+Looking at table \ref{id3ga}, we see that not only does the ID3 algorithm beat GAs in almost all data sets, it also trounces it in time elapsed. We see no reason to recommend GAs for most decision-tree based tasks when ID3 with its different variations is so much faster and better.
+
+We're not sure why GAs underperformed as much as they did. Perhaps the mutation component operator is too weak on decision trees due to their constraints, or perhaps our fitness function is deficient. One of the problems with GAs is that you don't know if the problem is with the algorithm itself or with some parameters.
+
 
 \section{Conclusions}
-The conclusion section should be relatively short, and should not be a summary
-of your paper.  It should, however, bring up what you learned and what impact
-your results have on the rest of the field (and society as a
-whole, if applicable).  You should conclude, and bring your paper to an  end
-with any parting thoughts that are appropriate.
+From our investigation and comparison of genetic algorithms for decision trees vs ID3, we conclude that in almost all cases where decision trees are applicable, ID3 does a good job of classifying data, and it does it much faster than genetic algorithms. As is often the case in machine learning, a good heuristic can beat random exploration of the data. It's possible that under some circumstances, genetic algorithms will be better than ID3. We have not found that to be the case with our data.
 
-Certain types of papers can be ended with a ``Summary'' section instead of a
-``Conclusions'' section, in which case you would, in fact, summarize the main
-points of your paper.  For this paper, you should write a Conclusions section,
-not a Summary.
-
-Conclusion also often contain information about what else you would like
-to do.  Sometimes this is a separate subsection, or even a section, entitled
-``Future Work.''  The basic idea here is to talk about what the next steps to
-take would be.  This is of benefit to others who are interested in your
-work and may want to help advance it.  It is also a chance for you to
-acknowledge shortcomings in your work; since we never have infinite time to
-prepare a paper, there are always more experiments that would have been nice to
-include.  If you list them as future work, then it at least makes it clear that
-you didn't do those things because you didn't have time, rather than because you
-didn't realise that they were important to do.
-
-In your paper, you should include a brief discussion of avenues for possible
-future work in your Conclusions section.  It should be tied in with the rest of
-your conclusion, and should not be an unrelated section tacked on the end (or
-the middle).
+We hope to study this topic further, specifically the underperformance of GAs. We hope to find some data sets on which they prove to be more effective.
 
 % many different styles of bibliography are available; plain is fine for this
 % assignment
