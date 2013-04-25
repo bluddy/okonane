@@ -11,6 +11,8 @@ let soi = string_of_int
 let sof = string_of_float
 let ios = int_of_string
 let fos = float_of_string
+let bos = bool_of_string
+let sob = string_of_bool
 
 (* low precedence function application allows us to remove 
  * many () from our code *)
@@ -171,8 +173,8 @@ let list_intersperse la lb =
   in List.rev @: loop [] la lb
 
 (* functions without exceptions *)
-let list_find f l = try Some(List.find f l) 
-  with Not_found -> None
+let list_find f l = try Some(List.find f l) with Not_found -> None
+let map_find k m = try Some(Map.find k m) with Not_found -> None
 
 (* modify/add to an association list generically *)
 let assoc_modify f item l =
@@ -242,6 +244,18 @@ let create_2d_array dimx dimy init_f =
     Array.of_list l') ry in
   Array.of_list l
 
+(* fold over a 2d array *)
+(* a (i,j) index indicates colum, row, and the user function needs to handle it
+ *)
+let matrix_fold f init arr =
+  Array.fold_left (fun (j, acc) inner_arr ->
+      j+1, snd @: Array.fold_left 
+        (fun (i, acc') x -> i+1, f acc' ((i,j),x))
+        (0, acc)
+        inner_arr)
+    init
+    arr
+
 (* convert a list of lists to an array matrix for random access *)
 let matrix_of_lists l = 
   let l' = list_map Array.of_list l in
@@ -275,7 +289,13 @@ let rec binary_search a fn value : 'a bin_search_t =
 
 (* --- String functions --- *)
 (* split a string into lines *)
-let string_lines s = Str.split (Str.regexp "\n") s
+let string_lines s = Str.split (Str.regexp "\(\n\|\n\r\)+") s
+
+let string_unlines l = String.concat "\n" l
+
+let string_words s = Str.split (Str.regexp "[\t ]+") s
+
+let string_unwords l = String.concat " " l
 
 let string_take i s = let l = String.length s in
   let i' = if i > l then l else i in
@@ -286,9 +306,9 @@ let string_drop i s = let l = String.length s in
   Str.string_after s i'
 
 (* maybe function. default is for None, f is given the value on Some *)
-let maybe def f = function
-  | None -> def
-  | Some x -> f x
+let maybe def_fn fn = function
+  | None -> def_fn ()
+  | Some x -> fn x
 
 (* efficient way to get unique values from a function on a list *)
 let nubf fn xs =
@@ -299,3 +319,8 @@ let nubf fn xs =
 (* efficient function to get unique entities *)
 let nub xs = nubf id_fn xs
 
+(* bound a value by a max absolute *)
+let abs_bound v max =
+  if v > max then max else
+  if v < -max then -max else v
+  
