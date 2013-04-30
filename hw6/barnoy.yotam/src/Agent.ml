@@ -1,25 +1,33 @@
-(* Implements all types of agents *)
+(* Implements both learning agents *)
 open Util
-
-module Metric = struct
-  type agent_t = {
-      learning_iter : int;      (* number of iters performed so far *)
-      time : int64;             (* time in iters in ms *)
-      converged : bool;
-  }
-end
+open Actions
+open State
+open SimTypes
+open TransFunc
 
 module Value = struct
   type agent_t = {
       (* states in the world and their expected values *)
-      expected_values : float state_map_t;
-      world : worldmap_t option;
+      expected_values : float StateMap.t;
       discount_factor : float;
-      transition_fn : transition_fn_t option;
-      reward_fn : reward_fn_t option;
+      trans_fn : trans_fn_t;
       conv_tolerance : float;
   }
+
+  let new_agent t = {
+    expected_values = StateMap.empty;
+    discount_factor = 0.5;
+    trans_fn = t;
+    conv_tolerance = 0.000000001;
+  }
+
 end
+
+module StateActionMap = Map.Make(
+  struct
+    type t = state_t * action_t
+    let compare = Pervasives.compare
+  end)
 
 module Q = struct
   type agent_t = {
@@ -28,31 +36,29 @@ module Q = struct
     learning_factor : float;
     conv_tolerance : float;
     max_change : float; (* max delta perception of env during iter *)
-    visit_events : int state_action_map_t;
-    expected_rewards : float state_action_map_t;
-    simulator : simulator_t; (* simulator of the environment *)
+    visit_events : int StateActionMap.t;
+    expected_rewards : float StateActionMap.t;
+    simulator : simulator_t option; (* simulator of the environment *)
+  }
+  
+  let new_agent () = { 
+    min_explore_count = 1;
+    discount_factor = 0.99;
+    learning_factor = 0.5;
+    conv_tolerance = 0.000000001;
+    max_change=0.;
+    visit_events = StateActionMap.empty;
+    expected_rewards = StateActionMap.empty;
+    simulator = None;
   }
 end
 
-type agent_t = MetricAgent of Metric.agent_t * agent_t
-             | ValueIterAgent of Value.agent_t
+type agent_t = ValueIterAgent of Value.agent_t
              | QAgent of Q.agent_t
 
-let new_metric_agent a = 
-  MetricAgent({learning_iter = 0; time = 0; converged = false}, a)
-
-(* functions for metric agent only *)
-let metric_only f = function MetricAgent(a,t) -> Some(f a t) | _ -> None
-let get_time = metric_only (fun a _ -> a.time)
-let get_iter_count = metric_only (fun a _ -> a.learning_iter)
-let is_converged = metric_only (fun a _ -> a.converged)
-
-let set_simulator s = function
-  | MetricAgent(a,t) -> MetricAgent(a, set_simulator s t)
-  | QAgent(a) -> QAgent({a with simulator = s})
-  | x -> x (* can't set it for this *)
-
-                  
+(* choose an action based on the current state and a policy *)
+let decide_action policy state = list_head legal_actions
 
 (* single update *)
-let iterate agent =
+let iterate agent = agent, true
+

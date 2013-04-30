@@ -17,41 +17,40 @@ let terrain_of_string = function
   | "#" -> Wall
   | "S" -> Start
   | "F" -> Finish
-  | x   -> failwith "Character "^x^" doesn't match terrain types"
+  | x   -> failwith @: "Character "^x^" doesn't match terrain types"
 
 type worldmap_t = {
   size : pos_t;
-  data : terrain_t array;
+  data : terrain_t array array;
   pos_start : pos_t list;
   pos_finish : pos_t list;
 }
 
 let terrain_at m (x,y) =
-  let t = m.terrain in
+  let t = m.data in
   if x < 0 || y < 0 || Array.length t <= y then None
   else 
     let a = t.(y) in
     if Array.length a <= x then None
-    else a.(x)
+    else Some (a.(x))
       
 let string_of_mapdata m = 
   matrix_fold (fun acc (pos,x) -> 
       let newline = if fst pos = 0 && snd pos <> 0 then "\n" else "" in
       let c = string_of_terrain x in
       acc^newline^c)
-    ""
-    m
+    "" m
 
 let mapdata_of_lines lines =
   let ls = list_map (fun line ->
-    List.rev @: fst @: 
       iterate_until
         (fun (acc,str) -> 
-          let c = string_take 1 str in
-          let t = terrain_of_string c in
-          t::acc, string_drop 1 str)
-        (fun (_,str) -> str = "")
-        line
+          if str = "" then Left (List.rev acc)
+          else
+            let c = string_take 1 str in
+            let t = terrain_of_string c in
+            Right(t::acc, string_drop 1 str))
+        ([], line)
   )
   lines in
   matrix_of_lists ls
@@ -61,8 +60,8 @@ let mapdata_of_string str = mapdata_of_lines @: string_lines str
 (* obtain a full map structure from a string *)
 let map_of_string str =
   let lines = string_lines str in
-  let reg = Str.regexp "\([0-9]+\),\([0-9]+\)" in
-  if not Str.string_match reg @: list_head lines 
+  let reg = Str.regexp "\\([0-9]+\\),\\([0-9]+\\)" in
+  if not @: Str.string_match reg (list_head lines) 0
   then failwith "Bad format" else
   let rows_s, cols_s = Str.matched_group 1 str, Str.matched_group 2 str in
   let rows, cols = ios rows_s, ios cols_s in
@@ -72,7 +71,7 @@ let map_of_string str =
       | Start  -> pos::s,f
       | Finish -> s, pos::f
       | _      -> s, f)
-    data in
+    ([],[]) data in
   if list_null start then failwith "Must have a start position" else
   if list_null finish then failwith "Must have a finish position" else
   {size=cols,rows; data=data; pos_start=start; pos_finish=finish}
@@ -89,35 +88,7 @@ let map_str_write str_lines (x,y) c =
   let line' = string_take x line^c^string_drop (x+1) line in
   before @ line' :: list_tail remain
   
-(* retrieves a string representing a full simulation step *)
-let render_simulation_step world step =
-  let str = string_of_mapdata world.data in
-  let lines = string_lines str in
-  let min_rows = 5 in
-  let cols, rows = fst world.size, snd world.size in
-  let lines' = 
-    if rows < min_rows then 
-      (* make a blank line *)
-      let line = iterate (fun a -> a^" ") "" cols in
-      iterate (fun acc -> acc@line) lines (min_rows - rows)
-    else lines in
-  let get_line = List.nth lines' in (* curry *)
-  let pos_line = 
-    let l = get_line 1 in
-    l^"         Position: "^string_of_pos @: fst step.state in
-  let vel_line =
-    let l = get_line 2 in
-    l^"         Velocity: "^string_of_pos @: snd step.state in
-  let acc_line = maybe (fun () -> List.nth 3 lines') (fun action ->
-    let l = get_line 3 in
-    l^"         Accel:    "^string_of_pos @: action.accel)
-    step.action in
-  let score_line = 
-    let l = get_line 4 in
-    l^"         Score:    "^string_of_int @: step.before_score in
-  let lines = pos_line::vel_line::acc_line::score_line::(list_drop 4 lines') in
-  let lines' = map_str_write lines (fst step.state) "@" in
-  (string_unlines lines')^"\n"
-
 let in_start_finish lpos pos = List.mem pos lpos
+let in_finish world pos = in_start_finish world.pos_finish pos
+let in_start world pos = in_start_finish world.pos_start pos
 

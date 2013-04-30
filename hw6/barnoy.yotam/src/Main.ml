@@ -1,18 +1,19 @@
 open Util
+open Command
 
 let commands = [
-  EnvCommand, ["e"; "env"];
-  HelpCommand, ["h"; "help"; "?"];
-  IterCommand, ["i"; "iterate"];
-  LoadCommand, ["l"; "load"];
-  LoadWorldCommand, ["map"];
-  MakeCommand, ["make"];
-  MetricsCommand, ["metrics"];
-  QuitCommand, ["quit"];
-  SaveCommand, ["save"];
-  SetCommand, ["set"; "s"];
-  SimulateCommand, ["sim"; "simulate"];
-  VarHelpCommand, ["vhelp"]
+  (new_command EnvCommand), ["e"; "env"];
+  (new_command HelpCommand), ["h"; "help"; "?"];
+  (new_command IterCommand), ["i"; "iterate"];
+  (new_command LoadCommand), ["l"; "load"];
+  (new_command LoadWorldCommand), ["map"];
+  (new_command MakeCommand), ["make"];
+  (new_command MetricsCommand), ["metrics"];
+  (new_command QuitCommand), ["quit"];
+  (new_command SaveCommand), ["save"];
+  (new_command SetCommand), ["set"; "s"];
+  (new_command SimulateCommand), ["sim"; "simulate"];
+  (new_command VarHelpCommand), ["vhelp"]
 ]
 
 let main () =

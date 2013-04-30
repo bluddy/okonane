@@ -1,1 +1,3 @@
 true: use_str
+true: use_unix
+true: thread

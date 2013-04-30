@@ -11,9 +11,9 @@ module StringMap = Map.Make(
 
 type shell_t = {
     output_width : int;
-    command_map : command_t StringMap.t;
+    command_map : command_t ref StringMap.t;
     (* registrations seen by this shell *)
-    reg_set : (command_t * string list) list; 
+    reg_set : (command_t ref * string list) list; 
     terminate : bool;
     env: environment_t;
     worldmap : worldmap_t option;
@@ -61,22 +61,25 @@ let rec interpret shell command_str =
                 shell
     | Some command -> 
               try
-                Command.execute command shell args
+                Command.execute !command shell args
               with CommandFailure e -> print_string e; shell
 
 (* execute shell. first execute init_str *)
 let execute shell init_str =
   let init_sh = list_fold_until
-    (fun sh str -> interpret sh str)
-    (fun sh _   -> sh.terminate)
-    shell init_str in
+    (fun sh str -> 
+      if sh.terminate then Left sh
+      else Right (interpret sh str))
+    shell 
+    init_str in
   iterate_until
     (fun sh ->
-      print_string prompt;
-      let s = read_line () in
-      if s = "" then sh
-      else interpret sh s)
-    (fun sh -> sh.terminate)
+      if sh.terminate then Left sh
+      else
+        print_string prompt;
+        let s = read_line () in
+        if s = "" then Right sh
+        else Right (interpret sh s))
     init_sh
 
 

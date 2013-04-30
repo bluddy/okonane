@@ -14,6 +14,9 @@ let fos = float_of_string
 let bos = bool_of_string
 let sob = string_of_bool
 
+(* Either type *)
+type ('a, 'b) either_t = Right of 'a | Left of 'b
+
 (* low precedence function application allows us to remove 
  * many () from our code *)
 let (@:) f x = f x;;
@@ -25,8 +28,6 @@ let compose f g = fun x -> f (g x)
 let id_fn a = a
 
 let (|-) = compose
-
-type ('a,'b) either_t = Left of 'a | Right of 'b
 
 let list_null = function [] -> true | _ -> false
 
@@ -74,18 +75,14 @@ let list_remove r l =
 
 let compose_fn f g x = f(g x)
 
-(* function that folds until a predicate is true, which point the output is
- * finalized. The fin function takes the remaining list *)
-let rec foldl_until_fin f p fin acc = function
-    | ((x::_) as l) when p acc x -> fin acc l
-    | x::xs -> foldl_until_fin f p fin (f acc x) xs 
-    | []    -> fin acc [] 
-
 (* function that folds until a predicate is true *)
-let rec foldl_until f p acc = function
-    | x::_ when p acc x -> acc 
-    | x::xs -> foldl_until f p (f acc x) xs 
-    | []    -> acc
+let rec foldl_until f acc = function
+    | x::xs -> 
+        begin match f acc x with
+        | Left a -> a
+        | Right acc' -> foldl_until f acc' xs
+        end
+    | [] -> acc
 
 (* I/O helpers *)
 (* read a file and convert it into lines *)
@@ -100,6 +97,11 @@ let read_file_lines file =
   close_in in_chan; ls 
 
 let read_file file = String.concat "\n" @: read_file_lines file
+
+let write_file file s =
+  let out_chan = open_out file in
+  output_string out_chan s;
+  close_out out_chan
 
 (* make a range from first to last. Tail recursive *)
 let create_range ?(step=1) first length =
@@ -131,15 +133,16 @@ let list_mapi f l = List.rev @: snd @: List.fold_left
 (* calls f on its output over and over, num times *)
 let iterate f init num = 
   let rec loop acc = function
-    | i when i<= 0 -> acc
+    | i when i <= 0 -> acc
     | i -> loop (f acc) (i-1)
   in loop init num
 
 (* calls f on its output over and over again until p is true *)
-let iterate_until f p init =
+let iterate_until f init =
   let rec loop acc = 
-    if p acc then acc
-    else loop (f acc)
+    match f acc with 
+    | Left  a -> a
+    | Right b -> loop b
   in loop init
 
 (* repeat a function many times, building a list from indices *)
@@ -174,7 +177,7 @@ let list_intersperse la lb =
 
 (* functions without exceptions *)
 let list_find f l = try Some(List.find f l) with Not_found -> None
-let map_find k m = try Some(Map.find k m) with Not_found -> None
+let find fn k m = try Some(fn k m) with Not_found -> None
 
 (* modify/add to an association list generically *)
 let assoc_modify f item l =
@@ -248,12 +251,13 @@ let create_2d_array dimx dimy init_f =
 (* a (i,j) index indicates colum, row, and the user function needs to handle it
  *)
 let matrix_fold f init arr =
-  Array.fold_left (fun (j, acc) inner_arr ->
+  snd @: 
+    Array.fold_left (fun (j, acc) inner_arr ->
       j+1, snd @: Array.fold_left 
         (fun (i, acc') x -> i+1, f acc' ((i,j),x))
         (0, acc)
         inner_arr)
-    init
+    (0,init)
     arr
 
 (* convert a list of lists to an array matrix for random access *)
@@ -289,7 +293,7 @@ let rec binary_search a fn value : 'a bin_search_t =
 
 (* --- String functions --- *)
 (* split a string into lines *)
-let string_lines s = Str.split (Str.regexp "\(\n\|\n\r\)+") s
+let string_lines s = Str.split (Str.regexp "\\(\n\\|\n\r\\)+") s
 
 let string_unlines l = String.concat "\n" l
 
@@ -324,3 +328,6 @@ let abs_bound v max =
   if v > max then max else
   if v < -max then -max else v
   
+(* get time in ms *)
+let time_millis () = Sys.time () *. 1000.
+
