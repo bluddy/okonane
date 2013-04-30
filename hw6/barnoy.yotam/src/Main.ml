@@ -22,5 +22,6 @@ let main () =
   let args = list_tail @: array_map id_fn Sys.argv in
   Shell.execute_sh s' args
 
+let _ = main ()
 
 

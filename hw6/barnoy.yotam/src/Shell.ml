@@ -373,7 +373,7 @@ let rec interpret shell command_str =
     | Some command -> 
               try
                 execute command shell args
-              with CommandFailure e -> print_string e; shell
+              with CommandFailure e -> P.printf "%s\n" e; shell
 
 (* execute shell. first execute init_str *)
 let execute_sh shell init_str =

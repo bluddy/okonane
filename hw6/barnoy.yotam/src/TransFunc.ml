@@ -29,18 +29,18 @@ let hard_crash_outcomes world =
 let crash_filter world tfunc oldstate ((newpos, (vx, vy)) as newstate) =
   let ((oldx, oldy) as oldpos) = fst oldstate in
   (* see if crash occurred *)
-  if terrain_at world oldpos =Some Wall then hard_crash_outcomes world else
+  if terrain_at world oldpos = Wall then hard_crash_outcomes world else
   let increments = max (abs vx) (abs vy) in
   (* Special case - not moving.  (i/increments==NaN) *)
   match increments, terrain_at world newpos with
-  | 0, Some Wall -> hard_crash_outcomes world
+  | 0, Wall -> hard_crash_outcomes world
   | 0, _    -> [newstate, 1.]
   | _, _    -> 
     let dx, dy = foi vx /. foi increments, foi vy /. foi increments in
     let rec loop i ((x,y) as p) =
       begin match i, terrain_at world (round_pos p) with
       | i, _ when i >= increments -> None
-      | _, Some Wall -> Some (round_pos p)
+      | _, Wall -> Some (round_pos p)
       | i, _    -> loop (i+1) (x+.dx, y+.dy)
       end in
     match loop 0 (foi oldx, foi oldy) with
@@ -52,11 +52,10 @@ let crash_filter world tfunc oldstate ((newpos, (vx, vy)) as newstate) =
 (* return a list of states and probabilities *)
 let transition world tfunc state action : (state_t * float) list =
   let t = WorldMap.terrain_at world (fst state) in
-  if t = Some Wall then hard_crash_outcomes world
+  if t = Wall then hard_crash_outcomes world
   else
     let slip_prob = match t with
-    | None -> failwith "Starting position is outside of map"
-    | Some Ground | Some Start | Some Finish -> 0.1
+    | Ground | Start | Finish -> 0.1
     | _ (* Rough *) -> 0.6 in
 
     (* calculate successful acceleration *)

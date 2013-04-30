@@ -28,11 +28,11 @@ type worldmap_t = {
 
 let terrain_at m (x,y) =
   let t = m.data in
-  if x < 0 || y < 0 || Array.length t <= y then None
+  if x < 0 || y < 0 || Array.length t <= y then Wall
   else 
     let a = t.(y) in
-    if Array.length a <= x then None
-    else Some (a.(x))
+    if Array.length a <= x then Wall
+    else a.(x)
       
 let string_of_mapdata m = 
   matrix_fold (fun acc (pos,x) -> 
