@@ -4,6 +4,7 @@ open State
 open Actions
 open SimTypes
 open WorldMap
+open Environment
 open Thread
 
 
@@ -15,8 +16,10 @@ type sim_step_t = {
   after_score : float;
 }
 
+
 (* retrieves a string representing a full simulation step *)
-let render_simulation_step world step =
+let render_simulation_step sim step =
+  let world = sim.world in
   let str = string_of_mapdata world.data in
   let lines = string_lines str in
   let min_rows = 5 in
@@ -44,22 +47,16 @@ let render_simulation_step world step =
   let lines' = map_str_write lines (fst step.state) "@" in
   (string_unlines lines')^"\n"
 
-let log_message (sim:simulator_t) step = 
-  let world = sim.world in
-  let delta = (sim.last_display +. sim.output_delay) -. time_millis () in
+let log_message (sim:sim_t) step = 
+  let delta = (sim.last_display +. foi sim.output_delay) -. time_millis () in
   if delta > 0. then Thread.delay (delta /. 1000.);
-  let s = render_simulation_step world step in
+  let s = render_simulation_step sim step in
   print_string s;
   {sim with last_display = time_millis ()}
 
 let execute_transition world trans_fn state action =
   let outcomes = TransFunc.transition world trans_fn state action in
   if list_null outcomes then failwith "Malformed probability model!" else
-  (* make cumulative list of probs *)
-  let cum_l = List.fold_left 
-    (fun (acc,sump) (x,p) -> (x, sump +. p)::acc, sump +. p) 
-    ([],0.) 
-    outcomes in
   let prob = Random.float 1. in
   let result_state = snd @: 
     foldl_until 
@@ -71,11 +68,12 @@ let execute_transition world trans_fn state action =
   result_state, Reward.get_reward world result_state
 
 (* runs a sim. takes policy, returns simulation steps *)
-let simulate world trans_fn sim policy : sim_step_t list =
+let simulate sim policy : sim_step_t list =
+  let world, trans_fn = sim.world, sim.trans_fn in
   let start_state = get_random_start_state world in
   let score, history = 
     let rec loop (score, ((pos,_) as state), history, sim) =
-      if in_finish world pos then score, List.rev history
+      if in_finish world pos then score, history
       else
         let action = Agent.decide_action policy state in
         let new_state, score' = execute_transition world trans_fn state action in
@@ -86,7 +84,7 @@ let simulate world trans_fn sim policy : sim_step_t list =
         loop (new_score, new_state, step::history, sim')
     in
     loop (0., start_state, [], sim) in
-  history
+  List.rev history
 
 
 

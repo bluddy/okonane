@@ -4,6 +4,7 @@ open Actions
 open State
 open SimTypes
 open TransFunc
+open WorldMap
 
 module Value = struct
   type agent_t = {
@@ -11,12 +12,14 @@ module Value = struct
       expected_values : float StateMap.t;
       discount_factor : float;
       trans_fn : trans_fn_t;
+      world : worldmap_t;
       conv_tolerance : float;
   }
 
-  let new_agent t = {
+  let new_agent w t = {
     expected_values = StateMap.empty;
     discount_factor = 0.5;
+    world = w;
     trans_fn = t;
     conv_tolerance = 0.000000001;
   }
@@ -38,7 +41,7 @@ module Q = struct
     max_change : float; (* max delta perception of env during iter *)
     visit_events : int StateActionMap.t;
     expected_rewards : float StateActionMap.t;
-    simulator : simulator_t option; (* simulator of the environment *)
+    sim : sim_t option; (* simulator of the environment *)
   }
   
   let new_agent () = { 
@@ -49,9 +52,11 @@ module Q = struct
     max_change=0.;
     visit_events = StateActionMap.empty;
     expected_rewards = StateActionMap.empty;
-    simulator = None;
+    sim = None;
   }
 end
+
+type policy_t = int
 
 type agent_t = ValueIterAgent of Value.agent_t
              | QAgent of Q.agent_t
@@ -60,5 +65,9 @@ type agent_t = ValueIterAgent of Value.agent_t
 let decide_action policy state = list_head legal_actions
 
 (* single update *)
-let iterate agent = agent, true
+let iterate agent = true, agent
+
+(* get a policy from an agent *)
+let get_policy a = 1
+
 

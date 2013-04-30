@@ -10,14 +10,13 @@ module StateSet = Set.Make(
     let compare = Pervasives.compare
   end)
 
-
 type trans_fn_t = {
-  hard_crash : bool;      (* hard crash resets to starting line *)
+  hard_crash_b : bool;      (* hard crash resets to starting line *)
   outcomes : StateSet.t;
 }
 
-let new_trans_fun hard_crash = 
-  {hard_crash=hard_crash; outcomes=StateSet.empty}
+let new_trans_fn hard_crash : trans_fn_t = 
+  {hard_crash_b=hard_crash; outcomes=StateSet.empty}
 
 (* get the outcomes of a hard crash *)
 (* we can end up in any start position *)
@@ -45,7 +44,7 @@ let crash_filter world tfunc oldstate ((newpos, (vx, vy)) as newstate) =
       | i, _    -> loop (i+1) (x+.dx, y+.dy)
       end in
     match loop 0 (foi oldx, foi oldy) with
-    | Some p when tfunc.hard_crash -> hard_crash_outcomes world
+    | Some p when tfunc.hard_crash_b -> hard_crash_outcomes world
     | Some p -> (* stop agent at the crash site *)
                 [(p, (0,0)), 1.]
     | None   -> [newstate, 1.]

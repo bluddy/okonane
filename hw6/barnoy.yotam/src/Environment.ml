@@ -1,6 +1,6 @@
 open Util
 
-type environment_t = {
+type env_t = {
   epsilon : float;   (* for convergance tolerance *)
   alpha : float;     (* control learning rate *)
   gamma : float;     (* discount factor *)

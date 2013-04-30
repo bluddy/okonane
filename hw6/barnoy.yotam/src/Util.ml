@@ -314,6 +314,8 @@ let maybe def_fn fn = function
   | None -> def_fn ()
   | Some x -> fn x
 
+let unwrap_maybe x = maybe (fun () -> failwith "none value") id_fn x
+
 (* efficient way to get unique values from a function on a list *)
 let nubf fn xs =
     let blank = Hashtbl.create (List.length xs) in

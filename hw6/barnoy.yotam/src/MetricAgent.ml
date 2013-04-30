@@ -9,13 +9,15 @@ type metric_agent_t = {
 }
 
 let new_metric_agent a = 
-  MetricAgent({learning_iter = 0; time = 0; converged = false}, a)
+ {learning_iter = 0; time = Int64.of_int 0; converged = false; agent = a}
 
 let set_simulator metric s = 
   let agent = match metric.agent with
-    | QAgent(a) -> QAgent({a with simulator = s})
+    | QAgent(a) -> QAgent({a with Q.sim = Some s})
     | x -> x (* can't set it for this *)
   in
   {metric with agent = agent}
+
+let get_policy a = Agent.get_policy a.agent
 
 
