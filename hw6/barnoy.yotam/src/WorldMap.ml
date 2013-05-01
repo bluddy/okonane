@@ -92,3 +92,13 @@ let in_start_finish lpos pos = List.mem pos lpos
 let in_finish world pos = in_start_finish world.pos_finish pos
 let in_start world pos = in_start_finish world.pos_start pos
 
+(* get a list of all positions in the world *)
+let all_positions world =
+  matrix_fold (fun acc ((i,j),x) -> match x with 
+    | Ground | Rough | Start | Finish -> (i,j)::acc
+    | _ -> acc) 
+  [] world.data
+  
+
+
+

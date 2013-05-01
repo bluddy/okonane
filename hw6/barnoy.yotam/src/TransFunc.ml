@@ -18,6 +18,10 @@ type trans_fn_t = {
 let new_trans_fn hard_crash : trans_fn_t = 
   {hard_crash_b=hard_crash; outcomes=StateSet.empty}
 
+let max_speed = 5
+let max_velocity = max_speed
+let min_velocity = (-max_speed)
+
 (* get the outcomes of a hard crash *)
 (* we can end up in any start position *)
 let hard_crash_outcomes world =
@@ -60,7 +64,7 @@ let transition world tfunc state action : (state_t * float) list =
 
     (* calculate successful acceleration *)
     let pos, vel = fst state, snd state in
-    let new_vel = add_pair_bound vel action 5 in
+    let new_vel = add_pair_bound vel action max_velocity in
     let new_pos = add_pair pos new_vel in
     let no_slip_state = new_pos, new_vel in
     let slip_state = add_pair pos vel, vel in (* no change in vel *)

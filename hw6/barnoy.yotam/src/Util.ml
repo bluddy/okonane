@@ -190,7 +190,7 @@ let assoc_modify f item l =
 
 
 (* find the maximum element of a list according to a transformation function (to int) *)
-let list_minmax op l f = match l with
+let list_minmax f op l = match l with
   | [x]   -> (x, f x)
   | x::xs -> 
     List.fold_left 
@@ -199,9 +199,19 @@ let list_minmax op l f = match l with
       (x, f x) xs
   | _     -> invalid_arg "Empty list"
 
-let list_max l f = list_minmax (>) l f
-let list_min l f = list_minmax (<) l f
-    
+let list_max f l = list_minmax f (>) l
+let list_min f l = list_minmax f (<) l
+
+(* perform a cross-product on 2 lists. Doesn't preserve order *)
+let cross_product l1 l2 =
+  List.fold_left (fun acc x ->
+      List.fold_left (fun acc' y -> (x,y)::acc')
+        acc
+        l2
+    )
+    []
+    l1
+
 (* flatten a list, removing option elements *)
 let flatten_option l = List.filter (function None -> false | Some _ -> true) l
 
