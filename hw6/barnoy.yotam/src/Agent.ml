@@ -129,13 +129,13 @@ let iterate agent = match agent with
           let st, act, r_st = step.state, step.action, step.result_state in
           let reward = step.after_score -. step.before_score in
           (* find the score of the max action for the result state *)
-          let max_next = snd @: list_max (* TODO: change to acc *)
-            (fun action -> sam_lookup_float (r_st, action) exp_rs) 
+          let max_next = snd @: list_max
+            (fun action -> sam_lookup_float (r_st, action) acc_vals) 
             legal_actions
           in
-          let cur_val = sam_lookup_float (st, act) exp_rs in (* TODO: change to acc *)
+          let cur_val = sam_lookup_float (st, act) acc_vals in
           let learning = reward +. (discount_fac *. max_next) in
-          let num_visit = sam_lookup_int (st, act) visits in (* TODO: acc_visits *)
+          let num_visit = sam_lookup_int (st, act) acc_visits in
           let exp_val = alpha_mix learn_fac anneal cur_val learning num_visit in
           let exp_rs' = SAM.add (st,act) exp_val acc_vals in
           let visits' = SAM.add (st, act) (num_visit+1) visits in
