@@ -3,6 +3,7 @@ open Util
 type env_t = {
   epsilon : float;   (* for convergance tolerance *)
   alpha : float;     (* control learning rate *)
+  annealing : int;   (* whether we should use annealing and by how much (0 is none) *)
   gamma : float;     (* discount factor *)
   min_explore : int; (* min times to explore a state *)
   hard_crash : bool; (* whether hard crashing is used *)
@@ -14,6 +15,7 @@ type env_t = {
 let default_env = {
   epsilon = 0.;
   alpha = 0.5;
+  annealing = 0;
   gamma = 1.;
   min_explore = 1;
   hard_crash = false;
@@ -31,6 +33,8 @@ let bos s = match String.lowercase s with
 (* string functions for getting/setting the env *)
 let get_epsilon_s env = sof env.epsilon
 let set_epsilon_s env s = {env with epsilon = fos s}
+let get_annealing_s env = soi env.annealing
+let set_annealing_s env s = {env with annealing = ios s}
 let get_alpha_s e = sof e.alpha
 let set_alpha_s e s = {e with alpha = fos s}
 let get_gamma_s e = sof e.gamma
@@ -49,6 +53,7 @@ let set_report_delay_s e s = {e with report_delay = ios s}
 let env_funcs = [
   "epsilon", (get_epsilon_s, set_epsilon_s); 
   "alpha", (get_alpha_s, set_alpha_s);
+  "annealing", (get_annealing_s, set_annealing_s);
   "gamma", (get_gamma_s, set_gamma_s);
   "min_explore", (get_min_explore_s, set_min_explore_s);
   "hard_crash", (get_hard_crash_s, set_hard_crash_s);

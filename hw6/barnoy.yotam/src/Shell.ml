@@ -193,6 +193,7 @@ let execute command shell args = match snd command with
             Q.learning_factor = env.alpha;
             conv_tolerance = env.epsilon;
             discount_factor = env.gamma;
+            annealing = env.annealing;
             min_explore_count = env.min_explore;
           })
         | _ -> raise @: CommandFailure ("unrecorgnized agent type "^agent_type)

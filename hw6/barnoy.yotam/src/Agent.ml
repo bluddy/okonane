@@ -43,23 +43,16 @@ module Value = struct
     }
 end
 
-module StateActionMap = Map.Make(
-  struct
-    type t = state_t * action_t
-    let compare = Pervasives.compare
-  end)
-
-module SAM = StateActionMap (* shortcut *)
-
 module Q = struct
   type agent_t = {
     min_explore_count : int;    (* num of times to explore state-action pair *)
     discount_factor : float;
     learning_factor : float;
+    annealing : int;            (* how much to anneal by *)
     conv_tolerance : float;
     max_change : float;         (* tracks max delta in our perception of env during iter *)
-    visit_events : int StateActionMap.t;
-    expected_rewards : float StateActionMap.t;
+    visit_events : int SAM.t;
+    expected_rewards : float SAM.t;
     sim : sim_t;                (* simulator of the environment *)
   }
   
@@ -68,11 +61,12 @@ module Q = struct
     { 
       min_explore_count = 1;
       discount_factor = 0.99;
+      annealing = 0;
       learning_factor = 0.5;
       conv_tolerance = tolerance;
       max_change=0.;
-      visit_events = StateActionMap.empty;
-      expected_rewards = StateActionMap.empty;
+      visit_events = SAM.empty;
+      expected_rewards = SAM.empty;
       sim = {SimTypes.world = w; trans_fn = t; verbose = false; 
         output_delay = 0; last_display = 0.}
     }
@@ -86,17 +80,18 @@ type agent_t = ValueIterAgent of Value.agent_t
 let get_policy = function
   | ValueIterAgent a -> 
       ValuePolicy(a.Value.world, a.Value.expected_values, a.Value.trans_fn)
-  | QAgent a -> QPolicy
+  | QAgent a -> 
+      QPolicy(a.Q.expected_rewards, a.Q.visit_events, a.Q.min_explore_count)
 
-(* the function for proportions of learning *)
-let alpha_mix learn_factor current learned num_visits =
-  let a = if learn_factor >= 0. then learn_factor 
-          else (60. /. (59. +. foi num_visits)) in
+(* Function for mixing proportions of learning using alpha *)
+(* if we're using annealing, annealing must be > 1. 
+ * Otherwise, we use a constant *)
+let alpha_mix learn_factor annealing current learned num_visits =
+  let a = match annealing with
+          | 0 | 1  -> learn_factor (* constant *)
+          | an     -> foi an /. (foi (an - 1) +. foi num_visits)
+  in
   ((1. -. a) *. current) +. (a *. learned)
-
-(* lookup functions that nullify an unfound value in StateActionMap *)
-let sam_lookup_int key map = try SAM.find key map with Not_found -> 0
-let sam_lookup_float key map = try SAM.find key map with Not_found -> 0.
 
 (* single update *)
 let iterate agent = match agent with
@@ -126,37 +121,30 @@ let iterate agent = match agent with
   | QAgent a -> 
       let exp_rs, visits = a.Q.expected_rewards, a.Q.visit_events in
       let learn_fac, discount_fac = a.Q.learning_factor, a.Q.discount_factor in
+      let anneal = a.Q.annealing in
       let policy = get_policy agent in
       let history = simulate a.Q.sim policy in
-      let _, max_delta, exp_rs, visits = List.fold_left 
-        (fun (last, max_delta, acc_vals, acc_visits) step ->
+      let max_delta, exp_rs, visits = List.fold_left 
+        (fun (max_delta, acc_vals, acc_visits) step ->
           let st, act, r_st = step.state, step.action, step.result_state in
           let reward = step.after_score -. step.before_score in
           (* find the score of the max action for the result state *)
-          let max_next = 
-            if last then 0.  (* last state doesn't have actions *)
-            else 
-              snd @: list_max (* TODO: change to acc *)
-                (fun action -> sam_lookup_float (r_st, action) exp_rs) 
-                legal_actions
+          let max_next = snd @: list_max (* TODO: change to acc *)
+            (fun action -> sam_lookup_float (r_st, action) exp_rs) 
+            legal_actions
           in
           let cur_val = sam_lookup_float (st, act) exp_rs in (* TODO: change to acc *)
-          let scaled_current = (1. -. learn_fac) *. cur_val in
           let learning = reward +. (discount_fac *. max_next) in
-          let scaled_learning = learn_fac *. learning in
-          let exp_val = scaled_current +. scaled_learning in
+          let num_visit = sam_lookup_int (st, act) visits in (* TODO: acc_visits *)
+          let exp_val = alpha_mix learn_fac anneal cur_val learning num_visit in
           let exp_rs' = SAM.add (st,act) exp_val acc_vals in
-          let inc_visit state action = 
-            let num = sam_lookup_int (state,action) visits in
-            SAM.add (state,action) (num+1) visits
-          in
-          let visits' = inc_visit st act in
-          let delta = exp_val -. cur_val in
+          let visits' = SAM.add (st, act) (num_visit+1) visits in
+          let delta = abs_float @: exp_val -. cur_val in
           let new_max_d = if delta > max_delta
                           then delta else max_delta in
-          (false, new_max_d , exp_rs', visits')
+          (new_max_d , exp_rs', visits')
         )
-        (true, 0., exp_rs, visits)
+        (0., exp_rs, visits)
         history
     in
     let conv = if max_delta <= a.Q.conv_tolerance then true else false in
