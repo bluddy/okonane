@@ -67,7 +67,7 @@ let execute_transition world trans_fn state action =
       outcomes in
   result_state, Reward.get_reward world result_state
 
-(* runs a sim. takes policy, returns simulation steps *)
+(* runs a sim. takes policy, returns simulation steps in reverse order *)
 let simulate sim policy : sim_step_t list =
   let world, trans_fn = sim.world, sim.trans_fn in
   let start_state = get_random_start_state world in
@@ -75,7 +75,7 @@ let simulate sim policy : sim_step_t list =
     let rec loop (score, ((pos,_) as state), history, sim) =
       if in_finish world pos then score, history
       else
-        let action = Agent.decide_action policy state in
+        let action = Policy.decide_action policy state in
         let new_state, score' = execute_transition world trans_fn state action in
         let new_score = score +. score' in
         let step = {state=state; action=action; result_state=new_state;
@@ -84,7 +84,7 @@ let simulate sim policy : sim_step_t list =
         loop (new_score, new_state, step::history, sim')
     in
     loop (0., start_state, [], sim) in
-  List.rev history
+  history
 
 
 

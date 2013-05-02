@@ -203,7 +203,7 @@ let list_max f l = list_minmax f (>) l
 let list_min f l = list_minmax f (<) l
 
 (* perform a cross-product on 2 lists. Doesn't preserve order *)
-let cross_product l1 l2 =
+let cartesian_product l1 l2 =
   List.fold_left (fun acc x ->
       List.fold_left (fun acc' y -> (x,y)::acc')
         acc

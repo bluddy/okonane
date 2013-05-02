@@ -2,12 +2,19 @@
 open Util
 open Actions
 open State
+open Simulator
 open SimTypes
 open TransFunc
 open WorldMap
 open Reward
+open Policy
 
 let tolerance = 0.000000001
+
+(* list of all possible velocity combinations *)
+let x_y_velocities () = 
+  let vels = create_range min_velocity @: max_velocity - min_velocity + 1 in
+  cartesian_product vels vels
 
 module Value = struct
   type agent_t = {
@@ -21,10 +28,7 @@ module Value = struct
 
   (* create a new value iterating agent *)
   let new_agent w t = 
-    let velocities = 
-      create_range min_velocity @: max_velocity - min_velocity + 1 in
-    let x_y_vels = cross_product velocities velocities in
-    let all_states = cross_product (all_positions w) x_y_vels in
+    let all_states = cartesian_product (all_positions w) (x_y_velocities ()) in
     (* initialize the expected values to the rewards *)
     let m = List.fold_left 
       (fun acc state -> StateMap.add state (get_reward w state) acc)
@@ -45,50 +49,54 @@ module StateActionMap = Map.Make(
     let compare = Pervasives.compare
   end)
 
+module SAM = StateActionMap (* shortcut *)
+
 module Q = struct
   type agent_t = {
-    min_explore_count : int; (* num of times to explore state-action pair *)
+    min_explore_count : int;    (* num of times to explore state-action pair *)
     discount_factor : float;
     learning_factor : float;
     conv_tolerance : float;
-    max_change : float; (* max delta perception of env during iter *)
+    max_change : float;         (* tracks max delta in our perception of env during iter *)
     visit_events : int StateActionMap.t;
     expected_rewards : float StateActionMap.t;
-    sim : sim_t option; (* simulator of the environment *)
+    sim : sim_t;                (* simulator of the environment *)
   }
   
-  let new_agent () = { 
-    min_explore_count = 1;
-    discount_factor = 0.99;
-    learning_factor = 0.5;
-    conv_tolerance = tolerance;
-    max_change=0.;
-    visit_events = StateActionMap.empty;
-    expected_rewards = StateActionMap.empty;
-    sim = None;
-  }
+  (* Create a new Q agent *)
+  let new_agent w t = 
+    { 
+      min_explore_count = 1;
+      discount_factor = 0.99;
+      learning_factor = 0.5;
+      conv_tolerance = tolerance;
+      max_change=0.;
+      visit_events = StateActionMap.empty;
+      expected_rewards = StateActionMap.empty;
+      sim = {SimTypes.world = w; trans_fn = t; verbose = false; 
+        output_delay = 0; last_display = 0.}
+    }
 end
 
 type agent_t = ValueIterAgent of Value.agent_t
              | QAgent of Q.agent_t
 
-(* get all possible states we can go to *)
-let get_possible_states world start_state trans_fn =
-  List.rev_map (fun action ->
-      action, transition world trans_fn start_state action)
-    legal_actions
 
-(* get the maximum expected value from all possible transition states *)
-let get_max_exp_val state_exp_vals possible_states = 
-  list_max 
-    (fun (_, dest_states) ->
-      List.fold_left (fun sum (state, prob) ->
-          (* multiply the prob by the state's exp val *)
-          sum +. (prob *. StateMap.find state state_exp_vals)
-        )
-        0. dest_states
-    )
-    possible_states
+(* get a policy from an agent *)
+let get_policy = function
+  | ValueIterAgent a -> 
+      ValuePolicy(a.Value.world, a.Value.expected_values, a.Value.trans_fn)
+  | QAgent a -> QPolicy
+
+(* the function for proportions of learning *)
+let alpha_mix learn_factor current learned num_visits =
+  let a = if learn_factor >= 0. then learn_factor 
+          else (60. /. (59. +. foi num_visits)) in
+  ((1. -. a) *. current) +. (a *. learned)
+
+(* lookup functions that nullify an unfound value in StateActionMap *)
+let sam_lookup_int key map = try SAM.find key map with Not_found -> 0
+let sam_lookup_float key map = try SAM.find key map with Not_found -> 0.
 
 (* single update *)
 let iterate agent = match agent with
@@ -115,26 +123,47 @@ let iterate agent = match agent with
       in
       conv, ValueIterAgent({a with Value.expected_values = exp_vals})
 
-  | QAgent a -> true, agent
-
-
-type policy_t = ValuePolicy of worldmap_t * float StateMap.t * trans_fn_t
-          | QPolicy
-
-
-(* get a policy from an agent *)
-let get_policy = function
-  | ValueIterAgent a -> 
-      ValuePolicy(a.Value.world, a.Value.expected_values, a.Value.trans_fn)
-  | QAgent a -> QPolicy
-
-(* choose an action based on the current state and a policy *)
-let decide_action policy state : action_t = match policy with
-  | ValuePolicy(w, exp_vals, trans) ->
-      let poss = get_possible_states w state trans in 
-      fst @: fst @: get_max_exp_val exp_vals poss
-
-  | QPolicy -> list_head legal_actions
-
+  | QAgent a -> 
+      let exp_rs, visits = a.Q.expected_rewards, a.Q.visit_events in
+      let learn_fac, discount_fac = a.Q.learning_factor, a.Q.discount_factor in
+      let policy = get_policy agent in
+      let history = simulate a.Q.sim policy in
+      let _, max_delta, exp_rs, visits = List.fold_left 
+        (fun (last, max_delta, acc_vals, acc_visits) step ->
+          let st, act, r_st = step.state, step.action, step.result_state in
+          let reward = step.after_score -. step.before_score in
+          (* find the score of the max action for the result state *)
+          let max_next = 
+            if last then 0.  (* last state doesn't have actions *)
+            else 
+              snd @: list_max (* TODO: change to acc *)
+                (fun action -> sam_lookup_float (r_st, action) exp_rs) 
+                legal_actions
+          in
+          let cur_val = sam_lookup_float (st, act) exp_rs in (* TODO: change to acc *)
+          let scaled_current = (1. -. learn_fac) *. cur_val in
+          let learning = reward +. (discount_fac *. max_next) in
+          let scaled_learning = learn_fac *. learning in
+          let exp_val = scaled_current +. scaled_learning in
+          let exp_rs' = SAM.add (st,act) exp_val acc_vals in
+          let inc_visit state action = 
+            let num = sam_lookup_int (state,action) visits in
+            SAM.add (state,action) (num+1) visits
+          in
+          let visits' = inc_visit st act in
+          let delta = exp_val -. cur_val in
+          let new_max_d = if delta > max_delta
+                          then delta else max_delta in
+          (false, new_max_d , exp_rs', visits')
+        )
+        (true, 0., exp_rs, visits)
+        history
+    in
+    let conv = if max_delta <= a.Q.conv_tolerance then true else false in
+    conv, QAgent({ a with 
+            Q.max_change = max_delta; 
+            expected_rewards = exp_rs;
+            visit_events = visits
+          })
 
 

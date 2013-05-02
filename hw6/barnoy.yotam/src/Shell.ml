@@ -188,7 +188,7 @@ let execute command shell args = match snd command with
             Value.conv_tolerance = env.epsilon;
             discount_factor = env.gamma;
           })
-        | "q"  -> let a = Q.new_agent () in
+        | "q"  -> let a = Q.new_agent (unwrap_maybe shell.world) t_fn in
           QAgent ({a with 
             Q.learning_factor = env.alpha;
             conv_tolerance = env.epsilon;
