@@ -20,8 +20,8 @@ let main () =
   let s = Shell.new_shell 79 in
   let s' = Shell.register s commands in
   let args = list_tail @: array_map id_fn Sys.argv in
-  Shell.execute_sh s' args
+  ignore(Shell.execute_sh s' args)
 
-let _ = main ()
+let _ = if !Sys.interactive then () else main ()
 
 
