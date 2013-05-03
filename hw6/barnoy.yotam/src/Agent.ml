@@ -83,15 +83,13 @@ let get_policy = function
   | QAgent a -> 
       QPolicy(a.Q.expected_rewards, a.Q.visit_events, a.Q.min_explore_count)
 
-(* Function for mixing proportions of learning using alpha *)
 (* if we're using annealing, annealing must be > 1. 
  * Otherwise, we use a constant *)
-let alpha_mix learn_factor annealing current learned num_visits =
-  let a = match annealing with
-          | 0 | 1  -> learn_factor (* constant *)
-          | an     -> foi an /. (foi (an - 1) +. foi num_visits)
-  in
-  ((1. -. a) *. current) +. (a *. learned)
+let get_learn_factor const_learn_fact annealing num_visits =
+  match annealing with
+  | 0 | 1  -> const_learn_fact (* constant *)
+  | an     -> 
+      const_learn_fact *. (foi an /. (foi (an - 1) +. foi num_visits))
 
 (* single update *)
 let iterate agent = match agent with
@@ -136,7 +134,8 @@ let iterate agent = match agent with
           let cur_val = sam_lookup_float (st, act) acc_vals in
           let learning = reward +. (discount_fac *. max_next) in
           let num_visit = sam_lookup_int (st, act) acc_visits in
-          let exp_val = alpha_mix learn_fac anneal cur_val learning num_visit in
+          let alpha = get_learn_factor learn_fac anneal num_visits in
+          let exp_val = (1. -. alpha) *. cur_val +. alpha *. learning in
           let exp_rs' = SAM.add (st,act) exp_val acc_vals in
           let visits' = SAM.add (st, act) (num_visit+1) visits in
           let delta = abs_float @: exp_val -. cur_val in
