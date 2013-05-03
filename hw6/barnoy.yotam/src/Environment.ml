@@ -5,6 +5,9 @@ type env_t = {
   alpha : float;     (* control learning rate *)
   annealing : int;   (* whether we should use annealing and by how much (0 is none) *)
   gamma : float;     (* discount factor *)
+  use_basis : bool;  (* whether to use radial basis functions *)
+  basis_max_dist : float; (* max distance between radial basis functions *)
+  basis_width : float; (* width of basis functions *)
   min_explore : int; (* min times to explore a state *)
   hard_crash : bool; (* whether hard crashing is used *)
   verbose_sim : bool; (* simulation causes printed updates *)
@@ -17,6 +20,9 @@ let default_env = {
   alpha = 0.5;
   annealing = 0;
   gamma = 1.;
+  use_basis = false;
+  basis_max_dist = 10.;
+  basis_width = 15.;
   min_explore = 1;
   hard_crash = false;
   verbose_sim = false;
@@ -39,6 +45,12 @@ let get_alpha_s e = sof e.alpha
 let set_alpha_s e s = {e with alpha = fos s}
 let get_gamma_s e = sof e.gamma
 let set_gamma_s e s = {e with gamma = fos s}
+let set_use_basis_s e s = {e with use_basis = bos s}
+let get_use_basis_s e = sob e.use_basis
+let set_basis_max_dist_s e s = {e with basis_max_dist = fos s}
+let get_basis_max_dist_s e = sof e.basis_max_dist
+let get_basis_width_s e = sof e.basis_width
+let set_basis_width_s e s = {e with basis_width = fos s}
 let get_min_explore_s e = soi e.min_explore
 let set_min_explore_s e s = {e with min_explore = ios s}
 let get_hard_crash_s e = sob e.hard_crash
@@ -55,6 +67,9 @@ let env_funcs = [
   "alpha", (get_alpha_s, set_alpha_s);
   "annealing", (get_annealing_s, set_annealing_s);
   "gamma", (get_gamma_s, set_gamma_s);
+  "use_basis", (get_use_basis_s, set_use_basis_s);
+  "basis_width", (get_basis_width_s, set_basis_width_s);
+  "basis_max_dist", (get_basis_max_dist_s, set_basis_max_dist_s);
   "min_explore", (get_min_explore_s, set_min_explore_s);
   "hard_crash", (get_hard_crash_s, set_hard_crash_s);
   "verbose_sim", (get_verbose_sim_s, set_verbose_sim_s);

@@ -2,6 +2,7 @@
 open Util
 open Actions
 open State
+open StateAction
 open Simulator
 open SimTypes
 open TransFunc
@@ -52,12 +53,12 @@ module Q = struct
     conv_tolerance : float;
     max_change : float;         (* tracks max delta in our perception of env during iter *)
     visit_events : int SAM.t;
-    expected_rewards : float SAM.t;
-    sim : sim_t;                (* simulator of the environment *)
+    expected_rewards : FunMap.funmap_t;
+    sim : sim_t option;         (* simulator of the environment *)
   }
   
   (* Create a new Q agent *)
-  let new_agent w t = 
+  let new_agent use_basis basis_max_dist basis_width = 
     { 
       min_explore_count = 1;
       discount_factor = 0.99;
@@ -66,9 +67,9 @@ module Q = struct
       conv_tolerance = tolerance;
       max_change=0.;
       visit_events = SAM.empty;
-      expected_rewards = SAM.empty;
-      sim = {SimTypes.world = w; trans_fn = t; verbose = false; 
-        output_delay = 0; last_display = 0.}
+      expected_rewards = 
+        FunMap.new_funmap use_basis basis_max_dist basis_width;
+      sim = None   
     }
 end
 
@@ -117,39 +118,41 @@ let iterate agent = match agent with
       conv, ValueIterAgent({a with Value.expected_values = exp_vals})
 
   | QAgent a -> 
-      let exp_rs, visits = a.Q.expected_rewards, a.Q.visit_events in
+      let sim = unwrap_maybe a.Q.sim in
+      let exp_vals, visits = a.Q.expected_rewards, a.Q.visit_events in
       let learn_fac, discount_fac = a.Q.learning_factor, a.Q.discount_factor in
       let anneal = a.Q.annealing in
       let policy = get_policy agent in
-      let history = simulate a.Q.sim policy in
-      let max_delta, exp_rs, visits = List.fold_left 
+      let history = simulate sim policy in
+      let max_delta, exp_vals, visits = List.fold_left 
         (fun (max_delta, acc_vals, acc_visits) step ->
           let st, act, r_st = step.state, step.action, step.result_state in
           let reward = step.after_score -. step.before_score in
           (* find the score of the max action for the result state *)
           let max_next = snd @: list_max
-            (fun action -> sam_lookup_float (r_st, action) acc_vals) 
+            (fun action -> FunMap.lookup_val (r_st, action) acc_vals) 
             legal_actions
           in
-          let cur_val = sam_lookup_float (st, act) acc_vals in
+          let cur_val = FunMap.lookup_val (st, act) acc_vals in
           let learning = reward +. (discount_fac *. max_next) in
-          let num_visit = sam_lookup_int (st, act) acc_visits in
+          let num_visits = sam_lookup_int (st, act) acc_visits in
+          (* calculate a learning factor: either const or with annealing *)
           let alpha = get_learn_factor learn_fac anneal num_visits in
-          let exp_val = (1. -. alpha) *. cur_val +. alpha *. learning in
-          let exp_rs' = SAM.add (st,act) exp_val acc_vals in
-          let visits' = SAM.add (st, act) (num_visit+1) visits in
-          let delta = abs_float @: exp_val -. cur_val in
+          let exp_vals' = 
+            FunMap.update_val (st,act) alpha cur_val learning acc_vals in
+          let visits' = SAM.add (st, act) (num_visits+1) visits in
+          let delta = abs_float @: learning -. cur_val in
           let new_max_d = if delta > max_delta
                           then delta else max_delta in
-          (new_max_d , exp_rs', visits')
+          (new_max_d , exp_vals', visits')
         )
-        (0., exp_rs, visits)
+        (0., exp_vals, visits)
         history
     in
     let conv = if max_delta <= a.Q.conv_tolerance then true else false in
     conv, QAgent({ a with 
             Q.max_change = max_delta; 
-            expected_rewards = exp_rs;
+            expected_rewards = exp_vals;
             visit_events = visits
           })
 

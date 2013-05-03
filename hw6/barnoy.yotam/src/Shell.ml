@@ -3,7 +3,6 @@ open WorldMap
 open Environment
 open Simulator
 open TransFunc
-open Agent
 module P = Printf
 module MA = MetricAgent
 
@@ -133,13 +132,13 @@ let execute_iterate command shell args =
       | Some iter when i >= iter -> Left agent
 
       | None ->  (* infinity *)
-          let conv, a = iterate agent in
+          let conv, a = MA.iterate agent in
           progress_report 
             command shell false (P.sprintf "Iteration %d complete\n" i');
           Right(i', conv, a)
           
       | Some iter -> 
-          let conv, a = iterate agent in
+          let conv, a = MA.iterate agent in
           progress_report
             command shell (i' >= iter) 
             (P.sprintf "Iteration %d/%d (%.2f) complete" i' iter @:
@@ -180,23 +179,10 @@ let execute command shell args = match snd command with
       check_arg_count args 1 1;
       check_world_map shell;
       let agent_type = list_head args in
-      let agent = MA.new_metric_agent @: 
+      let agent = MA.new_agent (unwrap_maybe shell.world) env
         begin match agent_type with
-        | "vi" -> let t_fn = new_trans_fn env.hard_crash in
-          let a = Value.new_agent (unwrap_maybe shell.world) t_fn in
-          ValueIterAgent ({a with
-            Value.conv_tolerance = env.epsilon;
-            discount_factor = env.gamma;
-          })
-        | "q"  -> let a = Q.new_agent (unwrap_maybe shell.world) t_fn in
-          QAgent ({a with 
-            Q.learning_factor = env.alpha;
-            conv_tolerance = env.epsilon;
-            discount_factor = env.gamma;
-            annealing = env.annealing;
-            min_explore_count = env.min_explore;
-          })
-        | _ -> raise @: CommandFailure ("unrecorgnized agent type "^agent_type)
+        | "vi" -> true | "q"  -> false | _ -> raise @: 
+          CommandFailure ("unrecorgnized agent type "^agent_type)
         end in
         {shell with agent=Some agent}
 
@@ -247,7 +233,8 @@ let execute command shell args = match snd command with
         | _   -> 1) in
       let sim = build_sim shell in
       let _, total_score, scores' = Util.iterate
-        (fun (i, total_score, acc) -> let policy = get_policy shell.agent in
+        (fun (i, total_score, acc) -> 
+          let policy = MA.get_policy (unwrap_maybe shell.agent) in
           let steps = simulate sim policy in
           let score = (list_last steps).after_score in
           if sim_count > 1 then
@@ -271,6 +258,10 @@ let execute command shell args = match snd command with
        "alpha                  - Controls learning rate in RL agents.\n\
         epsilon                - Controls convergence tolerance in RL agents.\n\
         gamma                  - Controls discount factor in RL agents.\n\
+        use_basis              - Use radial basis functions for Q agent.\n\
+        basis_max_dist         - Maximum distance before planting another basis
+        function\n\
+        basis_width            - Width of each gaussian radial basis function\n\
         minExplorations        - Encourages RL agents to explore by setting a \
         minimum on the number of times they will visit a given state before \
         optimizing for expected reward.\n\

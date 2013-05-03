@@ -13,4 +13,10 @@ let add_pair_bound a b max =
 
 let round_pos (x,y) = (iof x, iof y)
 
+let dist_pos_no_root (x1,y1) (x2,y2) =
+  let dx = x2 - x1 in
+  let dy = y2 - y1 in
+  dx * dx + dy * dy
+
+let dist_pos a b = sqrt @: foi @: dist_pos_no_root a b
 
