@@ -6,12 +6,12 @@ open TransFunc
 type metric_agent_t = {
     agent : agent_t;
     learning_iter : int;      (* number of iters performed so far *)
-    time : int64;             (* time in iters in ms *)
+    time : float;             (* time in iters in ms *)
     converged : bool;
 }
 
 let new_metric_agent a = 
- {learning_iter = 0; time = Int64.of_int 0; converged = false; agent = a}
+ {learning_iter = 0; time = 0.; converged = false; agent = a}
 
 let new_agent world env typ = 
   new_metric_agent @:
@@ -43,6 +43,11 @@ let set_simulator metric s =
 
 let get_policy a = Agent.get_policy a.agent
 
-let iterate a = let conv, agent = Agent.iterate a.agent in
-  conv, {a with agent=agent}
+let iterate a = 
+  let time = time_millis () in
+  let conv, agent = Agent.iterate a.agent in
+  let delta = time_millis () -. time in
+  let total = a.time +. delta in
+  let iter = a.learning_iter + 1 in
+  conv, {agent=agent; time=total; learning_iter = iter; converged = conv}
 

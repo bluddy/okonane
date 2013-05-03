@@ -1,2 +1,2 @@
 #!/bin/bash
-time ./bin/MainEnt.native $@
+time ./bin/Main.native $@

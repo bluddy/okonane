@@ -162,14 +162,16 @@ let execute command shell args = match snd command with
   | LoadCommand ->
       check_arg_count args 1 1;
       let file = list_head args in
-      let data = read_file file in
+      let data = try read_file file 
+                 with Sys_error e -> raise @: CommandFailure e in
       let agent = (Marshal.from_string data 0 : MA.metric_agent_t) in
       {shell with agent = Some agent}
 
   | LoadWorldCommand ->
       check_arg_count args 1 1;
       let file = list_head args in
-      let data = read_file file in
+      let data = try read_file file 
+                 with Sys_error e -> raise @: CommandFailure e in
       let world = try map_of_string data 
                   with Failure e -> raise @: CommandFailure e in
       {shell with world = Some world}
@@ -191,7 +193,7 @@ let execute command shell args = match snd command with
       check_agent shell;
       let a = unwrap_maybe shell.agent in
       P.printf "Iterations: %d\n" a.MA.learning_iter;
-      P.printf "Time: %Ld ms\n"    a.MA.time;
+      P.printf "Time: %f ms\n"    a.MA.time;
       P.printf "Converged? %s\n"  (if a.MA.converged then "yes" else "no");
       shell
 
