@@ -1,0 +1,41 @@
+Aritificial Intelligence HW 5: Reinforcement Learning
+
+Yotam Barnoy
+
+Files:
+------
+_tags               - Used by the ocamlbuild system.
+run.sh              - Runs the program
+compile.sh          - Compiles using the ocamlbuild system.
+src/Agent.ml        - Implements the VI and Q agents
+src/Environment.ml  - Implementation of all environment variables.
+src/FunMap.ml       - Both map version and radial basis function version of function approximation.
+src/Logger.ml       - Deals with logging.
+src/Main.ml         - The main file of the program.
+src/MetricAgent.ml  - The agent doing measuring.
+src/MyRandom.ml     - Random-related functions I've developed.
+src/Policy.ml       - To do with policies
+src/Pos.ml          - Simple operations on pairs
+src/Reward.ml       - Simple reward function based on world
+src/Shell.ml        - Main code for the shell loop
+src/SimTypes.ml     - The type for simulation. Prevents circular inclusion.
+src/Simulator.ml    - The actual simulator code
+src/State.ml        - Things to do with state (pos, velocity)
+src/StateAction.ml  - Type that combines state and action. Used for distance and maps.
+src/TransFunc.ml    - Transition function related functions
+src/Util.ml   		- Different utility functions that I've personally written. These copy some of Haskell's API functionality.
+src/WorldMap.ml     - Operations related to the world map data structure.
+
+To build: run compile.sh. This will invoke the ocamlbuild system.
+To run: run run.sh
+
+The program is basically a port of the RLASH system from Java. For function approximation, one can either use the simple state-action map method, or radial basis functions. The variables added to RLASH are:
+
+- annealing: 0 causes no annealing over time (default). 60 will cause the annealing function to be 60 / (59 + n) etc
+- use_basis: whether to use radial basis functions.
+- basis_max_dist: the maximum Euclidean distance before dropping another radial basis function.
+- basis_width: the width of the radial basis functions.
+
+For radial basis functions, rather than spreading them out over the entire space (which is wasteful in many maps), we put them where we think they're needed by specifying a maximum distance to go before needing another one. 
+
+
