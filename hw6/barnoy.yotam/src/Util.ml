@@ -14,6 +14,9 @@ let fos = float_of_string
 let bos = bool_of_string
 let sob = string_of_bool
 
+(* round floats to integers *)
+let round f = if f > 0. then iof (f +. 0.5) else iof (f -. 0.5)
+
 (* Either type *)
 type ('a, 'b) either_t = Right of 'a | Left of 'b
 

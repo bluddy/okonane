@@ -24,7 +24,8 @@ let get_max_exp_val state_exp_vals possible_states =
           (* multiply the prob by the state's exp val *)
           let v = try
                     StateMap.find state state_exp_vals
-                  with Not_found -> failwith "Incomplete state map"
+                  with Not_found -> failwith @: 
+                    "Incomplete state map: "^string_of_state state
           in
           sum +. (prob *. v)
         )

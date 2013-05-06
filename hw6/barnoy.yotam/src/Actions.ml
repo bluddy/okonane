@@ -9,4 +9,4 @@ let legal_actions : action_t list =
   List.flatten @: 
     list_map (fun i -> list_map (fun j -> (i,j)) r) r
 
-let string_of_action (x,y) = "["^soi x^soi y^"]"
+let string_of_action (x,y) = "[a:"^soi x^","^soi y^"]"

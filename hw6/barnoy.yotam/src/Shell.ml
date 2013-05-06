@@ -99,7 +99,7 @@ let progress_report command shell force str =
   if time_millis () < !last_time +. foi shell.env.report_delay && not force 
   then ()
   else
-    print_string str;
+    print_endline str; 
     last_time := time_millis ()
 
 let build_sim shell =
@@ -134,15 +134,15 @@ let execute_iterate command shell args =
       | None ->  (* infinity *)
           let conv, a = MA.iterate agent in
           progress_report 
-            command shell false (P.sprintf "Iteration %d complete\n" i');
+            command shell false (P.sprintf "Iteration %d complete" i');
           Right(i', conv, a)
           
       | Some iter -> 
           let conv, a = MA.iterate agent in
           progress_report
             command shell (i' >= iter) 
-            (P.sprintf "Iteration %d/%d (%.2f) complete" i' iter @:
-            foi @: i' / iter * 100);
+            (P.sprintf "Iteration %d/%d (%2d%%) complete" i' iter
+            (i' * 100 / iter));
           Right (i', conv, a))
     (0, false, a) in
   {shell with agent=Some agent}
@@ -238,7 +238,7 @@ let execute command shell args = match snd command with
         (fun (i, total_score, acc) -> 
           let policy = MA.get_policy (unwrap_maybe shell.agent) in
           let steps = simulate sim policy in
-          let score = (list_last steps).after_score in
+          let score = (list_head steps).after_score in
           if sim_count > 1 then
             progress_report command shell (i+1 = sim_count) 
               (P.sprintf "Simulation: %d/%d (%.2f%%) complete" (i+1) sim_count
@@ -248,11 +248,11 @@ let execute command shell args = match snd command with
         sim_count in
       let scores = List.rev scores' in
       if sim_count > 1 then 
-        (P.printf "Simulation scores: \n"; List.iter (P.printf "%.2f") scores;
+        (P.printf "Simulation scores: \n"; List.iter (P.printf "%.2f ") scores;
         P.printf 
-        "Average simulation score: %f\n" (total_score /. foi sim_count);
+        "\nAverage simulation score: %f\n" (total_score /. foi sim_count);
         shell)
-      else (P.printf "Simulation score: %f\n" total_score; shell)
+      else (P.printf "Simulation score: %.2f\n" total_score; shell)
 
   | VarHelpCommand ->
       check_arg_count args 0 0;

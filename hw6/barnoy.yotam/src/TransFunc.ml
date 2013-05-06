@@ -12,11 +12,10 @@ module StateSet = Set.Make(
 
 type trans_fn_t = {
   hard_crash_b : bool;      (* hard crash resets to starting line *)
-  outcomes : StateSet.t;
 }
 
 let new_trans_fn hard_crash : trans_fn_t = 
-  {hard_crash_b=hard_crash; outcomes=StateSet.empty}
+  {hard_crash_b=hard_crash}
 
 let max_speed = 5
 let max_velocity = max_speed
@@ -32,7 +31,7 @@ let hard_crash_outcomes world =
 (* oldstate -> newstate -> resulting states and probs *)
 let crash_filter world tfunc oldstate ((newpos, (vx, vy)) as newstate) =
   let ((oldx, oldy) as oldpos) = fst oldstate in
-  (* see if crash occurred *)
+  (* see if crash occurred before state *)
   if terrain_at world oldpos = Wall then hard_crash_outcomes world else
   let increments = max (abs vx) (abs vy) in
   (* Special case - not moving.  (i/increments==NaN) *)
@@ -40,15 +39,18 @@ let crash_filter world tfunc oldstate ((newpos, (vx, vy)) as newstate) =
   | 0, Wall -> hard_crash_outcomes world
   | 0, _    -> [newstate, 1.]
   | _, _    -> 
-    let dx, dy = foi vx /. foi increments, foi vy /. foi increments in
-    let rec loop i ((x,y) as p) =
+    let dx, dy = foi vx /. foi increments, foi vy /. foi increments
+    in
+    let rec loop i ((x,y) as p) last_valid =
+      (*Printf.printf "%.2f,%.2f:%d,%d " x y (fst @: round_pos p) (snd @: round_pos p);*)
       begin match i, terrain_at world (round_pos p) with
-      | i, _ when i >= increments -> None
-      | _, Wall -> Some (round_pos p)
-      | i, _    -> loop (i+1) (x+.dx, y+.dy)
+      | _, Wall -> Some (round_pos last_valid)  (* crash *)
+      | i, _ when i >= increments -> None       (* no crash *)
+      | i, _    -> loop (i+1) (x+.dx, y+.dy) p  (* continue *)
       end in
-    match loop 0 (foi oldx, foi oldy) with
-    | Some p when tfunc.hard_crash_b -> hard_crash_outcomes world
+    let start_pos = foi oldx, foi oldy in
+    match loop 0 start_pos start_pos with
+    | Some _ when tfunc.hard_crash_b -> hard_crash_outcomes world
     | Some p -> (* stop agent at the crash site *)
                 [(p, (0,0)), 1.]
     | None   -> [newstate, 1.]
@@ -60,7 +62,8 @@ let transition world tfunc state action : (state_t * float) list =
   else
     let slip_prob = match t with
     | Ground | Start | Finish -> 0.1
-    | _ (* Rough *) -> 0.6 in
+    | Rough -> 0.6
+    | _ -> failwith "error" in
 
     (* calculate successful acceleration *)
     let pos, vel = fst state, snd state in
@@ -70,9 +73,9 @@ let transition world tfunc state action : (state_t * float) list =
     let slip_state = add_pair pos vel, vel in (* no change in vel *)
     
     (* reprocess for crash *)
-    let modify_p p (a,b) = (a, b *. p) in
     let slip = crash_filter world tfunc state slip_state in
     let no_slip = crash_filter world tfunc state no_slip_state in 
+    let modify_p p (a,b) = (a, b *. p) in
     list_map (modify_p slip_prob) slip @
     list_map (modify_p (1. -. slip_prob)) no_slip
     

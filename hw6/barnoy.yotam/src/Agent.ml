@@ -9,6 +9,7 @@ open TransFunc
 open WorldMap
 open Reward
 open Policy
+module P = Printf
 
 let tolerance = 0.000000001
 
@@ -30,6 +31,7 @@ module Value = struct
   (* create a new value iterating agent *)
   let new_agent w t = 
     let all_states = cartesian_product (all_positions w) (x_y_velocities ()) in
+    (*List.iter (fun s -> P.printf "%s \n" (string_of_state s)) all_states;*)
     (* initialize the expected values to the rewards *)
     let m = List.fold_left 
       (fun acc state -> StateMap.add state (get_reward w state) acc)
@@ -103,6 +105,14 @@ let iterate agent = match agent with
           let reward = get_reward w state in 
           (* get all possible states we can go to, and probs *)
           let poss = get_possible_states w state trans_fn in
+
+          (* debug *)
+          (*List.iter (fun (action, l) ->*)
+            (*P.printf "state: %s, action: %s\n"*)
+            (*(string_of_state state) (string_of_action action);*)
+              (*List.iter (fun (st, p) -> P.printf "pos_state: %s, prob: %f\n"*)
+                (*(string_of_state st) p) l;) poss;*)
+
           (* calculate the expected value *)
           let max = snd @: get_max_exp_val old_exp_vals poss in
           let new_expected = reward +. a.Value.discount_factor *. max in

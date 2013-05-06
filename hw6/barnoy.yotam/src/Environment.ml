@@ -26,7 +26,7 @@ let default_env = {
   min_explore = 1;
   hard_crash = false;
   verbose_sim = false;
-  verbose_sim_delay = 0;
+  verbose_sim_delay = 100;
   report_delay = 0;
 }
 

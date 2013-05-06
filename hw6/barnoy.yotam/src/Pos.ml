@@ -11,7 +11,7 @@ let add_pair_bound a b max =
   let (c,d) = add_pair a b in
   abs_bound c max, abs_bound d max
 
-let round_pos (x,y) = (iof x, iof y)
+let round_pos (x,y) = (round x, round y)
 
 let dist_pos_no_root (x1,y1) (x2,y2) =
   let dx = x2 - x1 in

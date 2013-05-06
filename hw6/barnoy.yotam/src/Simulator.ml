@@ -18,7 +18,7 @@ type sim_step_t = {
 
 
 (* retrieves a string representing a full simulation step *)
-let render_simulation_step sim step =
+let render_simulation_step sim step last =
   let world = sim.world in
   let str = string_of_mapdata world.data in
   let lines = string_lines str in
@@ -32,26 +32,27 @@ let render_simulation_step sim step =
     else lines in
   let get_line = List.nth lines' in (* curry *)
   let pos_line = 
-    let l = get_line 1 in
+    let l = get_line 0 in
     l^"         Position: "^string_of_pos @: fst step.state in
   let vel_line =
-    let l = get_line 2 in
+    let l = get_line 1 in
     l^"         Velocity: "^string_of_pos @: snd step.state in
   let acc_line = 
-    let l = get_line 3 in
+    let l = get_line 2 in
+    if last then l else
     l^"         Accel:    "^string_of_pos @: step.action in
   let score_line = 
-    let l = get_line 4 in
+    let l = get_line 3 in
     l^"         Score:    "^sof @: step.before_score in
   let lines = pos_line::vel_line::acc_line::score_line::(list_drop 4 lines') in
   let lines' = map_str_write lines (fst step.state) "@" in
-  (string_unlines lines')^"\n"
+  string_unlines lines'^"\n"
 
-let log_message (sim:sim_t) step = 
+let log_message (sim:sim_t) step last = 
   let delta = (sim.last_display +. foi sim.output_delay) -. time_millis () in
   if delta > 0. then Thread.delay (delta /. 1000.);
-  let s = render_simulation_step sim step in
-  print_string s;
+  let s = render_simulation_step sim step last in
+  print_endline s;
   {sim with last_display = time_millis ()}
 
 let execute_transition world trans_fn state action =
@@ -73,14 +74,20 @@ let simulate sim policy : sim_step_t list =
   let start_state = get_random_start_state world in
   let score, history = 
     let rec loop (score, ((pos,_) as state), history, sim) =
-      if in_finish world pos then score, history
+      if in_finish world pos then 
+        if sim.verbose then 
+          (* dummy step *)
+          let step = {state=state; action=list_head legal_actions; 
+            result_state=state; before_score = score; after_score=score} in
+          ignore(log_message sim step true); score, history
+        else score, history
       else
         let action = Policy.decide_action policy state in
         let new_state, score' = execute_transition world trans_fn state action in
         let new_score = score +. score' in
         let step = {state=state; action=action; result_state=new_state;
           before_score = score; after_score=new_score} in
-        let sim' = if sim.verbose then log_message sim step else sim in
+        let sim' = if sim.verbose then log_message sim step false else sim in
         loop (new_score, new_state, step::history, sim')
     in
     loop (0., start_state, [], sim) in
