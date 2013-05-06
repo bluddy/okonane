@@ -20,6 +20,8 @@ let main () =
   let s = Shell.new_shell 79 in
   let s' = Shell.register s commands in
   let args = list_tail @: array_map id_fn Sys.argv in
+  let args = list_bunch 2 args in
+  let args = list_map (fun l -> string_unwords l) args in
   ignore(Shell.execute_sh s' args)
 
 let _ = if !Sys.interactive then () else main ()
