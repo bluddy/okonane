@@ -6,6 +6,7 @@ open WorldMap
 open Actions
 open StateAction
 module F = FunMap
+module R = MyRandom
 
 type policy_t = ValuePolicy of worldmap_t * float StateMap.t * trans_fn_t
           | QPolicy of F.funmap_t * int SAM.t * int
@@ -37,31 +38,39 @@ let get_max_exp_val state_exp_vals possible_states =
 let decide_action policy state = match policy with
   | ValuePolicy(w, exp_vals, trans) ->
       let poss = get_possible_states w state trans in 
-      fst @: fst @: get_max_exp_val exp_vals poss, policy
+      fst @: fst @: get_max_exp_val exp_vals poss
 
   | QPolicy(exp_reward, visited, min_explore) -> 
-      (* first see if we have less than the min number of visits *)
-      let inc_visits st_act num = SAM.add st_act (num+1) visited in
-      let new_policy new_visited = 
-          QPolicy(exp_reward, new_visited, min_explore) in
+      (* debug *)
+      print_string (string_of_state state);
+      List.iter (fun action ->
+          let visit = sam_lookup_int (state,action) visited in
+          let v = F.lookup_val (state,action) exp_reward in
+          if visit <> 0 then 
+            Printf.printf "%s:%d:%f " (string_of_action action) visit v
+      ) legal_actions;
+      print_newline ();
+      (* debug *)
 
+      (* first see if we have less than the min number of visits *)
       let by_visit, num = 
         list_min_set (fun action -> sam_lookup_int (state,action) visited)
           legal_actions 
       in
-      Printf.printf "visit: %d" num; (* debug *)
-
-      if num < min_explore then
-        (print_newline ();
-        let action = MyRandom.random_select_one by_visit in
-        action, new_policy @: inc_visits (state, action) num)
-      else          (* go by best expectation *)
+      (* go by best expectation *)
+      let select_by_exp poss_actions =
         let actions, value = list_max_set
           (fun action -> F.lookup_val (state,action) exp_reward)
-          legal_actions in
-        Printf.printf " value: %.2f\n" value; (* debug *)
-        let action = MyRandom.random_select_one actions
-        in
-        (action, new_policy @: inc_visits (state, action) num)
+          poss_actions in
+        MyRandom.random_select_one actions
+      in
+      (* use random rolls to make sure we don't get stuck 
+       * in a min explore loop * *)
+      if num < min_explore && R.roll_f 0.8 then
+        MyRandom.random_select_one by_visit
+      else if R.roll_f 0.9 then
+        select_by_exp legal_actions
+      else 
+        R.random_select_one legal_actions
 
 

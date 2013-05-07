@@ -135,10 +135,6 @@ let iterate agent = match agent with
       let policy = get_policy agent in
       let history = simulate sim policy in
 
-      (* debug *)
-      List.iter (fun s -> Printf.printf "before: %f, after: %f\n" 
-      (s.before_score) (s.after_score)) history;
-
       let max_delta, exp_vals, visits,_ = List.fold_left 
         (fun (max_delta, acc_vals, acc_visits, last) step ->
           let st, act, r_st = step.state, step.action, step.result_state in
