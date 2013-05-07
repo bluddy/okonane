@@ -134,10 +134,16 @@ let iterate agent = match agent with
       let anneal = a.Q.annealing in
       let policy = get_policy agent in
       let history = simulate sim policy in
-      let max_delta, exp_vals, visits = List.fold_left 
-        (fun (max_delta, acc_vals, acc_visits) step ->
+
+      (* debug *)
+      List.iter (fun s -> Printf.printf "before: %f, after: %f\n" 
+      (s.before_score) (s.after_score)) history;
+
+      let max_delta, exp_vals, visits,_ = List.fold_left 
+        (fun (max_delta, acc_vals, acc_visits, last) step ->
           let st, act, r_st = step.state, step.action, step.result_state in
           let reward = step.after_score -. step.before_score in
+          if reward = 0. && not last then failwith "0 reward!" else
           (* find the score of the max action for the result state *)
           let max_next = snd @: list_max
             (fun action -> FunMap.lookup_val (r_st, action) acc_vals) 
@@ -152,11 +158,15 @@ let iterate agent = match agent with
             FunMap.update_val (st,act) alpha cur_val learning acc_vals in
           let visits' = SAM.add (st, act) (num_visits+1) visits in
           let delta = abs_float @: learning -. cur_val in
+
+          (* debug *)
+          Printf.printf "r:%f, c:%f, l:%f, a:%f\n" reward cur_val learning
+            alpha;
           let new_max_d = if delta > max_delta
                           then delta else max_delta in
-          (new_max_d , exp_vals', visits')
+          (new_max_d , exp_vals', visits', false)
         )
-        (0., exp_vals, visits)
+        (0., exp_vals, visits, true)
         history
     in
     let conv = if max_delta <= a.Q.conv_tolerance then true else false in

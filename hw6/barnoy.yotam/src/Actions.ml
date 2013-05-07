@@ -9,4 +9,6 @@ let legal_actions : action_t list =
   List.flatten @: 
     list_map (fun i -> list_map (fun j -> (i,j)) r) r
 
+let num_legal_actions = List.length legal_actions
+
 let string_of_action (x,y) = "[a:"^soi x^","^soi y^"]"

@@ -73,7 +73,7 @@ let simulate sim policy : sim_step_t list =
   let world, trans_fn = sim.world, sim.trans_fn in
   let start_state = get_random_start_state world in
   let score, history = 
-    let rec loop (score, ((pos,_) as state), history, sim) =
+    let rec loop (score, ((pos,_) as state), history, sim, policy) =
       if in_finish world pos then 
         if sim.verbose then 
           (* dummy step *)
@@ -82,15 +82,15 @@ let simulate sim policy : sim_step_t list =
           ignore(log_message sim step true); score, history
         else score, history
       else
-        let action = Policy.decide_action policy state in
+        let action, policy' = Policy.decide_action policy state in
         let new_state, score' = execute_transition world trans_fn state action in
         let new_score = score +. score' in
         let step = {state=state; action=action; result_state=new_state;
           before_score = score; after_score=new_score} in
         let sim' = if sim.verbose then log_message sim step false else sim in
-        loop (new_score, new_state, step::history, sim')
+        loop (new_score, new_state, step::history, sim', policy')
     in
-    loop (0., start_state, [], sim) in
+    loop (0., start_state, [], sim, policy) in
   history
 
 

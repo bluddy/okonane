@@ -34,21 +34,34 @@ let get_max_exp_val state_exp_vals possible_states =
     possible_states
 
 (* choose an action based on the current state and a policy *)
-let decide_action policy state : action_t = match policy with
+let decide_action policy state = match policy with
   | ValuePolicy(w, exp_vals, trans) ->
       let poss = get_possible_states w state trans in 
-      fst @: fst @: get_max_exp_val exp_vals poss
+      fst @: fst @: get_max_exp_val exp_vals poss, policy
 
   | QPolicy(exp_reward, visited, min_explore) -> 
       (* first see if we have less than the min number of visits *)
-      let action_by_visit, num = 
-        list_min (fun action -> sam_lookup_int (state,action) visited)
-          legal_actions in
-      if num < min_explore then action_by_visit
-      else (* now go by best expectation *)
-        fst @: list_max 
-          (fun action -> F.lookup_val (state,action) exp_reward)
-          legal_actions
+      let inc_visits st_act num = SAM.add st_act (num+1) visited in
+      let new_policy new_visited = 
+          QPolicy(exp_reward, new_visited, min_explore) in
 
-      
+      let by_visit, num = 
+        list_min_set (fun action -> sam_lookup_int (state,action) visited)
+          legal_actions 
+      in
+      Printf.printf "visit: %d" num; (* debug *)
+
+      if num < min_explore then
+        (print_newline ();
+        let action = MyRandom.random_select_one by_visit in
+        action, new_policy @: inc_visits (state, action) num)
+      else          (* go by best expectation *)
+        let actions, value = list_max_set
+          (fun action -> F.lookup_val (state,action) exp_reward)
+          legal_actions in
+        Printf.printf " value: %.2f\n" value; (* debug *)
+        let action = MyRandom.random_select_one actions
+        in
+        (action, new_policy @: inc_visits (state, action) num)
+
 

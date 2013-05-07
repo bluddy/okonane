@@ -205,6 +205,21 @@ let list_minmax f op l = match l with
 let list_max f l = list_minmax f (>) l
 let list_min f l = list_minmax f (<) l
 
+(* like minmax, except we get a set of all the minimum/max values *)
+let list_minmax_set f op l = match l with
+  | [x]   -> ([x], f x)
+  | x::xs -> 
+    List.fold_left 
+      (fun (l,v) m -> let n = f m in 
+                    if op n v then [m],n 
+                    else if n = v then m::l,v
+                    else l,v) 
+      ([x], f x) xs
+  | _     -> invalid_arg "Empty list"
+
+let list_max_set f l = list_minmax_set f (>) l
+let list_min_set f l = list_minmax_set f (<) l
+
 (* perform a cross-product on 2 lists. Doesn't preserve order *)
 let cartesian_product l1 l2 =
   List.fold_left (fun acc x ->
