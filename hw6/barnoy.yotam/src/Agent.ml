@@ -80,11 +80,14 @@ type agent_t = ValueIterAgent of Value.agent_t
 
 
 (* get a policy from an agent *)
-let get_policy = function
+let get_policy ?(learn=false) = function
   | ValueIterAgent a -> 
       ValuePolicy(a.Value.world, a.Value.expected_values, a.Value.trans_fn)
   | QAgent a -> 
-      QPolicy(a.Q.expected_rewards, a.Q.visit_events, a.Q.min_explore_count)
+      if learn then QLearnPolicy(
+          a.Q.expected_rewards, a.Q.visit_events, a.Q.min_explore_count)
+      else QPolicy(a.Q.expected_rewards)
+
 
 (* if we're using annealing, annealing must be > 1. 
  * Otherwise, we use a constant *)
@@ -132,7 +135,7 @@ let iterate agent = match agent with
       let exp_vals, visits = a.Q.expected_rewards, a.Q.visit_events in
       let learn_fac, discount_fac = a.Q.learning_factor, a.Q.discount_factor in
       let anneal = a.Q.annealing in
-      let policy = get_policy agent in
+      let policy = get_policy ~learn:true agent in
       let history = simulate sim policy in
 
       let max_delta, exp_vals, visits,_ = List.fold_left 
@@ -141,9 +144,14 @@ let iterate agent = match agent with
           let reward = step.after_score -. step.before_score in
           if reward = 0. && not last then failwith "0 reward!" else
           (* find the score of the max action for the result state *)
-          let max_next = snd @: list_max
-            (fun action -> FunMap.lookup_val (r_st, action) acc_vals) 
-            legal_actions
+          let max_next = List.fold_left
+            (fun max action -> 
+              match FunMap.lookup_val_m (r_st, action) acc_vals, max with
+              | None, _        -> max
+              | Some x, Some m -> if x > m then Some x else Some m
+              | Some x, None   -> Some x)
+            None legal_actions in
+          let max_next = match max_next with None -> 0. | Some x -> x
           in
           let cur_val = FunMap.lookup_val (st, act) acc_vals in
           let learning = reward +. (discount_fac *. max_next) in
@@ -152,12 +160,12 @@ let iterate agent = match agent with
           let alpha = get_learn_factor learn_fac anneal num_visits in
           let exp_vals' = 
             FunMap.update_val (st,act) alpha cur_val learning acc_vals in
-          let visits' = SAM.add (st, act) (num_visits+1) visits in
+          let visits' = SAM.add (st, act) (num_visits+1) acc_visits in
           let delta = abs_float @: learning -. cur_val in
 
           (* debug *)
-          Printf.printf "r:%f, c:%f, l:%f, a:%f\n" reward cur_val learning
-            alpha;
+          Printf.printf "r:%f, c:%f, l:%f, a:%f, v:%d\n" 
+            reward cur_val learning alpha num_visits;
           let new_max_d = if delta > max_delta
                           then delta else max_delta in
           (new_max_d , exp_vals', visits', false)
@@ -172,4 +180,14 @@ let iterate agent = match agent with
             visit_events = visits
           })
 
+let dump_agent = function
+  | QAgent a ->
+    FunMap.dump_funmap a.Q.visit_events a.Q.expected_rewards^
+    P.sprintf "Max change: %.2f\n" a.Q.max_change
+
+ | ValueIterAgent a ->
+     StateMap.fold (fun s v acc -> acc^string_of_state s^":"^sof v^"\n")
+     a.Value.expected_values
+     ""
+    
 

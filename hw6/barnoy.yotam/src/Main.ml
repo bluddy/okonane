@@ -13,7 +13,8 @@ let commands = [
   new_command SaveCommand, ["save"];
   new_command SetCommand, ["set"; "s"];
   new_command SimulateCommand, ["sim"; "simulate"];
-  new_command VarHelpCommand, ["vhelp"]
+  new_command VarHelpCommand, ["vhelp"];
+  new_command DumpCommand, ["d"; "dump"];
 ]
 
 let main () =

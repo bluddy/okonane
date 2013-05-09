@@ -51,3 +51,5 @@ let iterate a =
   let iter = a.learning_iter + 1 in
   conv, {agent=agent; time=total; learning_iter = iter; converged = conv}
 
+let dump_agent a = Agent.dump_agent a.agent
+

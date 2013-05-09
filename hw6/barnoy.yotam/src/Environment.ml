@@ -16,10 +16,10 @@ type env_t = {
 }
 
 let default_env = {
-  epsilon = 0.;
-  alpha = 0.5;
+  epsilon = 0.00000001;
+  alpha = 0.6;
   annealing = 0;
-  gamma = 1.;
+  gamma = 0.8;
   use_basis = false;
   basis_max_dist = 10.;
   basis_width = 15.;
