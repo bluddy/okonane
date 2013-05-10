@@ -138,11 +138,10 @@ let iterate agent = match agent with
       let policy = get_policy ~learn:true agent in
       let history = simulate sim policy in
 
-      let max_delta, exp_vals, visits,_ = List.fold_left 
-        (fun (max_delta, acc_vals, acc_visits, last) step ->
+      let max_delta, exp_vals, visits = List.fold_left 
+        (fun (max_delta, acc_vals, acc_visits) step ->
           let st, act, r_st = step.state, step.action, step.result_state in
           let reward = step.after_score -. step.before_score in
-          if reward = 0. && not last then failwith "0 reward!" else
           (* find the score of the max action for the result state *)
           let max_next = List.fold_left
             (fun max action -> 
@@ -168,9 +167,9 @@ let iterate agent = match agent with
             reward cur_val learning alpha num_visits;
           let new_max_d = if delta > max_delta
                           then delta else max_delta in
-          (new_max_d , exp_vals', visits', false)
+          (new_max_d , exp_vals', visits')
         )
-        (0., exp_vals, visits, true)
+        (0., exp_vals, visits)
         history
     in
     let conv = if max_delta <= a.Q.conv_tolerance then true else false in
