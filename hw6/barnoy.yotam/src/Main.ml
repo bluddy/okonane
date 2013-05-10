@@ -9,7 +9,7 @@ let commands = [
   new_command LoadWorldCommand, ["map"];
   new_command MakeCommand, ["make"];
   new_command MetricsCommand, ["metrics"];
-  new_command QuitCommand, ["quit"];
+  new_command QuitCommand, ["quit"; "q"];
   new_command SaveCommand, ["save"];
   new_command SetCommand, ["set"; "s"];
   new_command SimulateCommand, ["sim"; "simulate"];

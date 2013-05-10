@@ -26,12 +26,13 @@ type basis_t =
   }
 
 let string_of_basis b =
-  let s1 = P.sprintf "max_dist: %f, width: %f, inv_w: %f\n" 
-    b.max_distance b.width b.inv_width_square in
-  let ps = List.fold_left (fun acc (w, c) ->
-    acc^"\nbasis w:"^sof w^", c:"^string_of_st_act c) "" b.params
+  let s1 = P.sprintf "max_dist: %f, width: %f, inv_w: %f, num: %d\n" 
+    b.max_distance b.width b.inv_width_square (List.length b.params) in
+  let sort_pars = List.sort (fun (_,(((a,_),_),_)) (_,(((c,_),_),_)) -> c - a) b.params
+  in let ps = List.fold_left (fun acc (w, c) ->
+    acc^"\nbasis w:"^sof w^", c:"^string_of_st_act c) "" sort_pars
   in
-  s1^ps
+  ps^"\n"^s1
 
 let new_basis max_dist width =
   {

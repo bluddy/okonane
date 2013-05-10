@@ -21,6 +21,7 @@ type subtype_t = EnvCommand
             | SetCommand
             | SimulateCommand
             | VarHelpCommand
+            | DumpCommand
 
 type last_report_t = float
 type command_t = last_report_t ref * subtype_t
@@ -254,6 +255,13 @@ let execute command shell args = match snd command with
         shell)
       else (P.printf "Simulation score: %.2f\n" total_score; shell)
 
+  | DumpCommand ->
+      check_arg_count args 0 1;
+      check_agent shell;
+      let str = MA.dump_agent (unwrap_maybe shell.agent) in
+      if List.length args = 0 then (print_string str; shell)
+      else (write_file (list_head args) str; shell)
+
   | VarHelpCommand ->
       check_arg_count args 0 0;
       print_string 
@@ -336,6 +344,7 @@ let getLongHelp c name = match c with
 
   | VarHelpCommand   -> 
       "Usage: " ^ name ^ "\n\n" ^ "Displays help information for variables in the environment."
+  | DumpCommand  ->  "dumps parameters of an agent to screen or to a file"
 
 
 let getShortHelp c name = match c with
@@ -350,6 +359,7 @@ let getShortHelp c name = match c with
   | SetCommand       -> "sets environment variable values"
   | SimulateCommand  -> "runs a simulation"
   | VarHelpCommand   -> "displays information about environment variables"
+  | DumpCommand      -> "dumps the parameters of an agent into a file"
 
 (* interpret the provided string *)
 let rec interpret shell command_str =
