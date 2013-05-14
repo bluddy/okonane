@@ -1,0 +1,387 @@
+% This template was created by Ben Mitchell
+% for the JHU AI class, CS 335/435, spring 2008. 
+
+% the documentclass line says that this is an "article" (as opposed to, eg. a
+% book or a report).  This defines the basic formatting of the document.  The
+% arguments say that we want 12 point font (the default is 10), and 8.5"x11"
+% paper (the default is A4)
+%
+% If we said "report" instead of "article", then the title would be put on a
+% separate title page, rather than at the top of the first page of text, and the
+% numbering would be set up expecting chapters to be the top level divisions,
+% above sections.  Try it out, but be sure to use "article" for your
+% submission.
+\documentclass[12pt, letterpaper]{article}
+
+% the usepackage line states what extra packages we want to use
+% we use several "AMS" packages, which are created and distributed
+% by the American Mathematical Society (AMS), and have a number of useful
+% macros for writing math and equations.
+%
+% the graphicx package is one of several packages that can be used for
+% including images in a LaTeX document
+\usepackage{amsmath, amsthm, graphicx, url}
+\DeclareMathOperator*{\argmin}{argmin}
+\DeclareMathOperator*{\argmax}{argmax}
+
+
+% the title should contain your title.  Note the "\\"; this causes a linebreak.
+% By default, LaTeX ignores extra whitespace, including single linebreaks.
+% If you leave a blank line inbetween two blocks of text, that is interpreted as
+% a paragraph break.
+\title{Reinforcement Learning\\ Artificial Intelligence homework 5}
+
+% Put your name in the author field
+\author{Yotam Barnoy}
+
+% this begins the actual text of the document; everything before this is
+% refered to as "preamble"
+\begin{document}
+
+% the maketitle command formats and inserts the title, author name, and date
+\maketitle
+
+\begin{abstract}
+Reinforcement Learning is a technique used in Machine Learning to solve some difficult problems. We implement several variations of reinforcement learning techniques: value iteration, Q-learning, and Q-learning with radial basis functions. We compare these techniques by applying them to a simplified racetrack problem written in OCaml. We conclude that value iteration is the most time efficient but limited technique, while radial basis function is the most space efficient technique.
+
+\end{abstract}
+
+\section{Introduction}
+Machine Learning involves many different techniques for different domains. Reinforcement Learning is a specific technique that is useful in situations involving long-term learning, delayed reward, and exploration of the search space \cite{tomMitchellML}. While a simple DFS (depth-first search) may handle searching through spaces where the finish state is deep within the search space, it cannot handle state-spaces that are partially hidden, or ones with stochastic transitions from state to state. Also, unlike supervised learning, where a particular vector is labeled with its class, reinforcement learning takes inspiration from behavioral psychology, giving only a reward for being in a certain state \cite{reinforcementWikipedia}.  This is the niche that reinforcement learning occupies.
+
+There are several different approaches to reinforcement learning. Simple value iteration involves knowledge of the state space to be explored as well as the transition probabilities between those states\cite{russell10artificial}. Given such information, we can explore the state space quite effectively. Naturally, though, instances of possessing such knowledge can be rare. More often, we want to explore the environment without prior knowledge thereof, simply because it's unlikely that we can know the exact layout of a complex state-space or the transition probabilities between states. In this case, we would want to use a Q-Learning algorithm, which learns the state-space 'blindly' as it goes. 
+
+A further consideration when implementing reinforcement learning concerns the storage implementation of the particular algorithm chosen. A naive implementation uses a memory cell for every state or state-action combination visited by the algorithm as it explores the state-space. For a large enough state-space, this quickly becomes prohibitive. One might think that the implementation choice has no impact on the theoretical underpinnings of the algorithm, but in fact, it does. A memory-cell based approach can only learn the value of a specific state or state-action in the state-space, while a different approach -- one based on function approximation -- can generalize over any location in the state-space. 
+
+In this paper, we investigate three forms of reinforcement learning algorithms: value iteration with knowledge of the environment, Q-learning with no knowledge of the environment, and Q-learning with function approximation. For our function approximation algorithms we use radial basis functions with gradient descent. We compare the running times and performance characteristics of these three algorithms, including how varying their parameters affects their performance. Our implementation of the algorithms uses the functional OCaml language --- a language well suited to the needs of our algorithms.
+
+In section 2, we present the theoretical ideas behind reinforcement learning in its various forms. In section 3 we discuss radial basis functions and their applicability to our experiments. In section 4 we briefly discuss functional languages and how they pertain to our implementation. Section 5, 6 and 7 discuss the experimental configurations, the data sets used, and the results of said experiments. Finally, we analyze the results of our experiments and mention future possibilities. 
+
+
+\section{Reinforcement Learning}
+Reinforcement learning is based on the concept of reward. This is a little similar to the way that a mouse put in a maze receives a piece of cheese when it reaches the end of the maze. The reward is a feedback mechanism that serves to make an impression on the mouse's brain, so that the next time through the maze, the mouse will take the turns necessary to find the cheese faster. In fact, the similarities don't end there. Just as animal training is an iterative process, relying on a learned behavior that builds up gradually, so too, reinforcement learning is an iterative process. With each iteration, the reward values are propagated through the representational state-space of the algorithm. Eventually, the values in the state-space representation should converge to some degree of certainty, and the training phase of the algorithm is done. 
+
+In Reinforcement Learning, we have a set $S$ of possible states in which the agent can be, and a set $A$ of possible actions that could be carried out by the agent. After reaching a state $s_t \in S$ and carrying out an action $a_t \in A$ at time $t$, the agent receives some reward $r(s_t, a_t)$ and is moved to the next state $s_{t+1} = T(s_t, a_t)$. $T$ is called the transition function of the problem. 
+
+A concept crucial to reinforcement learning is that the transition function should correspond to a \emph{Markov Decision Process}, or MDP \cite{tomMitchellML}. A Markov Decision Process is one where the transition probability of $T$ from one state to another depends only on the last state and action (ie. at $t-1$) rather than on the state or action at any earlier time point. 
+
+A policy is a mapping from states to actions. The goal of a reinforcement learning algorithm is to learn a policy mapping, $\pi : S \rightarrow A$. Once we have a mapping $\pi$, we can navigate through the state-space by looking up the appropriate action given our state. The cumulative value $V^\pi(s_t)$ is defined as the sum of all current and future rewards:
+
+\begin{equation}
+    V^{\pi}(s_t) = \sum_{i=0}^\infty r_{t+i}
+\end{equation}
+
+However, rather than just summing up all the rewards, it's more useful to refer to a multiplier $\gamma, 0 < \gamma \le 1$ that discounts the future rewards of the agent. $\gamma$ allows current rewards to matter more than long term rewards, which is useful for finding the shortest path to the highest reward. Therefore, we can redefine $V^{\pi}(s_t)$ to be the discounted cumulative reward:
+
+\begin{equation}
+    V^{\pi}(s_t) = \sum_{i=0}^\infty \gamma r_{t+i}
+\end{equation}
+
+An ideal policy $\pi^*$ applied at an arbitrary state would maximize $V^{pi}$:
+
+\begin{equation}
+    \pi^* = \argmax_\pi V^{\pi}(s_t) 
+\end{equation}
+
+We can define the ideal discounted cumulative reward $V^*$ to be the discounted cumulative reward that results from following the ideal policy $\pi^*$. Since cumulative reward is defined as an infinite series to infinity, we can define the $V^*$ in terms of itself:
+
+\begin{equation}
+    V^*(s_t) = \argmax_\pi r(s_t) + V^*(s_{t+1}) 
+\end{equation}
+
+This recurrence relation is what we use to find $V^*$ and $\pi^*$ in all of the algorithms detailed in this paper.
+
+\subsection{Dynamic Programming}
+
+The standard algorithmic method of dealing with recurrence relations is to use recursion. Approximation of $V^*(s_t)$ would therefore involve, for each state of the state-space, iterating over all possible values on the right hand side of the equation. This would be completely intractable. Fortunately, we can simplify the implementation using the realization that the recurrence relation expresses $V^*(s_t)$ in terms of simpler values, $V^*(s_{t+1})$. Thus, by solving the subproblem first and memoizing the results, we can solve for $V^*(s_t)$ using our previous solutions. 
+
+All of the algorithms investigated in this paper use dynamic programming to some degree. 
+
+TODO: add example
+
+\subsection{Value Iteration}
+
+A simple application of dynamic programming to reinforcement learning involves the realization that, given the transition function $T$ with transition probabilities expressed by array $M$, the state-space $S$ and the reward function $R(s)$ we can find a recurrence relation on $U$, the utility of any particular state. We define $U(s_i)$ as:
+
+\begin{equation}
+    U(s_i) = R(s_i) + \gamma \sum_j M_{ij} U(s_j)
+\end{equation}
+
+The utility at each state is the expected discounted cumulative reward $V(s)$ for that state. The key here is that we have full knowledge of our state-space and the way in which we transition from one state to another. We also require quite a bit of memory to implement this algorithm: we require space proportional to our entire state-space. However, since this algorithm has knowledge of the environment, it is quite efficient. The training stage of the algorithm proceeds as follows:
+
+\begin{enumerate}
+    \item Iterate over every state, updating every utility value in an array according to the above relation.
+    \item If the highest change in utilities was less than a certain threshold, stop. Otherwise, go back to the previous step.
+\end{enumerate}
+
+Once the algorithm converges, we have a policy for navigating the state-space. Applying this policy is simple: since we always want to go in the direction of maximally increasing utility, we simply calculate $\argmax_j M_{tj} U(s_j)$ and proceed to move to the state with the highest expected utility.
+
+
+\subsection{Q-Learning}
+The advantage of the value iteration algorithm is that it is rather efficient. The disadvantage is that one must know both the state-space and the transition function between states. The transition probability matrix $M_{ij}$ is particularly hard to arrive at for many applications. Additionally, the value iteration model offers little hope for increased space efficiency.
+
+Q-learning is a more knowledge-agnostic algorithm than value iteration. The idea of Q-learning is that it isn't necessary to be aware of the state-space a-priori, nor is it important to know the transition probabilities, so long as one has feedback from the agent exploring the state-space, whether simulated or real. If we go back to the example of the mouse in the maze, if we can maintain a model of the previously encountered states and the actions taken by the mouse at each stage, as well as the reward gained from each step, we can slowly fill in a policy for the mouse to follow to get to its maximal reward aka the cheese. 
+
+In Q-learning, the basic unit of which we wish to keep track is the state-action rather than the state: at each state, we care specifically about which action obtained which cumulative reward. The recurrence relation defining Q-learning is
+
+\begin{equation}
+    Q_{t+1}(s_i, a) = (1-\alpha) Q_t(s_i, a) + \alpha (R(s_i) + \gamma \argmax_a (Q_t(s_j, a)))
+\end{equation}
+
+The $\alpha$ value in this equation is called the learning constant, and it indicates how much we want to adjust our values in a single increment. A sudden transition can cause values to diverge. Unfortunately, it means that we need yet another parameter in addition to the $\gamma$, which serves the same function it did in value iterations.
+
+Unlike value iteration, we cannot just iterate over the whole state-space in Q-learning. Rather, we are at the `mercy' of the exploration of the agent, which is in turn guided by our policy $\pi$. The algorithm consists of the following steps:
+
+\begin{enumerate}
+\item Initialize an empty state-action map containing Q values.
+\item Prepare a policy for the agent using the current map.
+\item Run the agent using the current policy, receiving both the agent's moves and the reward at every state encountered.
+\item Iterate over the history, updating the Q map according to the equation above. 
+\item If the maximum delta between a calculated new $Q_{t+1}(s, a)$ value and the old, stored $Q_t(s, a)$ value is less than a certain minimum amount, we consider the algorithm to have converged and conclude the training phase. Otherwise, proceed to step 2.
+\end{enumerate}
+
+The advantage of the Q-learning algorithm is that we don't need to know anything about the state-space our agent is exploring. All we need is the history from an agent as it reacts to our policy. The big disadvantage in comparison to value iteration is that we don't have direct access to the environment. All we can do is suggest a path for the agent to explore on his next iteration, and this lack of control translates into a very slow convergence rate.
+
+\subsubsection*{Exploration vs Exploitation}
+Because the Q-learning algorithm cannot freely explore the state-space as value iteration can, it's very important to maximize the information that can be obtained from the agent as it wanders about the environment. A policy that learns information, and only uses that information to direct the agent may cause the agent to revisit states that have been seen before. This may not be a problem except that, as in many machine learning examples, a low utility path may be hiding a high utility sub-path within it. Therefore, we want to encourage a balance of behaviors: we want the agent to use the information it has built up some of the time, and explore unknown states some of the time.
+
+There are several ways to accomplish this. One method is to set a certain threshold of visitations per state-action. If we encounter a state-action that has had fewer visits than this minimum threshold, we automatically explore the particular state-action. This requires saving an additional data structure mapping state-action values to integers representing number of visits. Every time we visit a state-action, we increment the counter of said state-action.
+
+Another method that is important involves the actual policy calculation, as opposed to the translation of policy into action. The $\alpha$ value that we use to moderate the speed of learning can be either a predetermined constant or a dynamic value. One commonly used dynamic value is an annealing-like functions, which serves to slowly decrease the variation in the Q values. An annealing function may look like
+
+\begin{equation}
+    f(n,\alpha) = \frac{60\alpha}{59 + n}
+\end{equation}
+
+Here, $n$ is the number of visits to the particular state-action. As $n$ increases, the annealing value gets lesser, slowly causing active state-actions to settle down to a final value.
+
+\section{Generalization}
+One of the advantages of Q-learning is that it gives us the option of not needing to know the whole state-space or the transition function, which may be extremely complicated. However, in the standard Q-learning algorithm, we don't gain much of a space complexity benefit from not being familiar with the world. We still need to keep track of the state-action space, and in the canonical Q-learning algorithm, we do that using an associative map that grows to include the entire space.
+
+Another concern is that we would like to be able to generalize from known state-action values to unknown ones. This is not possible in the generic Q-learning algorithm: if we miss just one state-action in our exploration, we cannot retrieve the Q-value of that state-action. Ideally, we would like to be able to learn this missing value, and therefore also to train the algorithm much faster. 
+
+The way to handle both of these concerns is with a supervised learning algorithm of some sort. Our state-action space to Q-value mapping is nothing more than a function, and we would like to learn this function with some kind of function-approximation algorithm. One common option is to use neural networks. Another is to use a linear model of basis functions in what amounts to a one-layer neural net. This is what we chose to use for this paper.
+
+\subsection{Radial Basis Functions}
+Radial basis functions (RBF) are functions whose value depends on distance from the center\cite{rbfWikipedia}. They are often used in function approximation. There are several possible types of RBFs, but the most common type uses Gaussian functions of the form 
+\begin{equation}
+    \phi(\vec{x}) = \exp {\frac{-||\vec{x}-\vec{c}||^2}{\sigma^2}}
+\end{equation}
+Where $\vec{c}$ is considered the center of the particular basis function, and $\sigma$ is its width.
+
+When basis functions are combined linearly, we get the form
+\begin{equation}
+    y(\vec{x}) = \sum_{i=1}^N w_i \phi(\vec{x})
+\end{equation}
+
+The $w_i$ term represents the array of weights of the different basis functions, which controls the contribution each basis function provides. This is the array we must keep in memory instead of the Q-values for each state-action.  
+
+When serving as a function approximation, the target function is approximated using a linear combination of Gaussian functions placed in different locations.
+
+The training of RBFs can be done in many ways. One of these ways is gradient descent, which is defined as
+\begin{equation}
+    b = a - \alpha \nabla F(a)
+\end{equation}
+
+Where $\nabla F(a)$ is the gradient of the function. Gradient descent finds the minimum point of the observed error in the Q-value estimates by slowly adjusting the parameters. In terms of the updates for our Q-values, we use the relation from \cite{russell10artificial}:
+
+\begin{equation}
+    \vec w_{t} = \vec w_{t-1} + \alpha(R(s) + Q_t(s, a) - Q_{t-1}(s, a)) \nabla \phi(s, a)
+\end{equation}
+
+For Gaussian radial basis functions, the gradient consists of the same function, $\phi$. What we therefore do is slowly update the values of $\vec w$ by the errors in Q, going in the direction of the gradient.
+
+
+\section{Functional Languages}
+
+Our language of choice is Ocaml, which is a functional language. A survey of functional languages and their history may be found in \cite{hudak1989conception}. Functional languages are centered around the ability to make and reuse higher-order functions. Most functional languages stress the importance of immutable, persistent data structures in simplifying the complexity of programming. Ocaml is no different except that Ocaml is an impure language, and as such, can be used for writing either canonical functional programs or imperative style programs with mutation, or a mix of the two styles.
+
+In terms of the implementation of the algorithms, OCaml proved more than capable for the task. Our first goal was to port the scaffolding that was provided by Ben Mitchell for this assignment over to Ocaml. The task did not seem daunting at first, but as often is the case in programming, the process took longer than the expected timeframe. Almost the entire framework was ported over from Java using purely functional idioms with immutable data structures. The one exception was the Observer pattern used for broadcasting the simulator's output, which cannot be realized in purely functional terms. Fortunately the pattern was not necessary and could be rewritten. In general, the resulting functional code probably wasn't as well written as it could be, given the fact that it was based on a pre-existing object-oriented pattern.
+
+One of the main methods of translating object oriented code to functional code consists of type unification: since subtyping is not possible to do in functional programming, each subtype was merged into the supertype. Variant types and pattern matching then do the job that dynamic dispatch does in object-oriented programming, with the main difference being that variant types are closed ie. they cannot be expanded without modifying the same file where they are defined, whereas subtyping is open --- other subtypes can be defined in completely separate files than the original supertypes.
+
+Once the framework was ready, functional programming paradigms proved adequate for the realization of the algorithms. For example, rather than using an array-based structure such as a hash table to store the utility values or the state-action values, we used a functional map which internally makes use of a tree structure.
+
+One problem that occurred with translation to Ocaml concerns the Q-learning algorithm and the `hard crash' setting, that causes the car to return to the start line after every crash. This setting makes the first iteration extremely long -- in the order of hours -- because the agent takes a very long time to explore the state-space. The problem with our translation of the code is that we retrieve the history of the simulation, and then process that to make changes to the policy. This is different from what the Java code does, but seemed similar enough given the fact that the Java code also creates a history in-memory. Unfortunately, the overly long run-time of the `hard crash' setting means that the code causes a memory overflow, making it impossible to test the effect of this setting. It would have been possible to program things differently, but by the time the mistake was realized and the auto-test logs were examined, there was not enough time to correct the mistake as well as run the experiments again.
+
+\section{Algorithms and Experimental Methods}
+It should be noted that in order to use reinforcement learning, we must assume that the underlying state-space is discrete, and that the transition probabilities from one state-action combination to another are constant. While the second assumption is reasonable for a given real-world problem given the fact that the state encapsulates all factors that may effect the transition probabilities, the first assumption limits the applicability of reinforcement learning to discrete spaces, not many of which are found in the real world. If the state-space is continuous, then we cannot have any real notion of state or of transitioning between states.
+
+For our state-space, we took a simplified, discretized race-track simulation. Within this simulation, a car (agent) exists on a two-dimensional grid, starting somewhere along the start line and ending at the finish line. The reward for each step the car takes is $-1$ in order to provide an incentive for the agent to finish the race with as few moves as possible. The reward for reaching the finish line is $0$. Different racetracks were fed into the simulation and the different agents were then trained to `drive' on these different tracks. For all algorithms, we used four different tracks, which will be detailed below.
+
+We timed the processing time necessary for each algorithm to converge while training, and then compared the results of the output policies on 1000 runs of the simulation. Note that in the case of Q-learning, we did not specifically wait for a particular convergence test to pass. Rather, we iterated 500,000 times, at which point we felt that the algorithm had converged as much as it was going to.
+
+The value iteration algorithm has only one parameter. We compared value iteration for different gamma (discount) values on the different tracks. Q-learning has additional parameters to configure, including an alpha (learning) value and a possible annealing function factor. The third algorithm -- Q-learning with basis functions -- requires the additional configuration of the basis functions themselves, which includes their width ($\sigma$) and the maximum distance between functions.
+
+We also experimented with the `hard crash' setting. This setting, when turned on, treats the car-agent in a more realistic manner: crashing into the walls of the simulation causes the car to be sent back to the start line. We found that this setting caused Q-learning to take far longer, and thus we only experimented with this setting in the R-track, as was required by the assignment. We compare the performance with hard-crash to the performance without it, as well as the resulting solutions.
+
+When it came to Q-learning with RBFs, one important issue was how to calculate distance. RBFs have a center point, and they `radiate' out of that center point according to a Gaussian curve. However, treating the entire state-action space as if it were a Euclidean space turned out to be a mistake. In reality, while the action at adjacent locations on the track should be quite similar, the distance between two different actions: acceleration, deceleration and no acceleration should be far greater. When calculating distances, we multiplied the acceleration and velocity numbers by constant factors to attempt to create more `distance' between adjacent actions and velocities. This is similar to training a neural net for each action. Regardless, even though this improved the performance of the RBF version, we never managed to get this version to converge properly.
+
+
+\subsection*{Data Sets}
+Four data sets were provided by the instructor:
+\begin{enumerate}
+    \item L-track: this is a simple track resembling an L-shape. It presents a minimal challenge for all algorithms.
+    \item O-track: this track, resembling an incomplete O-shape, presents more of a challenge to the algorithms.
+    \item O-track2: this is a more advanced form of the O-track, involving a slippery surface along the turn.
+    \item R-track: this is by far the most challenging track, with multiple turns until the finish line is reached.
+\end{enumerate}
+
+
+\section{Results}
+
+
+\begin{table}[htbp]
+\caption{Value Iteration with different gamma values}
+\begin{center}
+\begin{tabular}{|l|l|r|r|r|r|}
+\hline
+\textbf{Gamma} & \textbf{Measure} & \multicolumn{1}{l|}{\textbf{L-track}} & \multicolumn{1}{l|}{\textbf{O-track}} & \multicolumn{1}{l|}{\textbf{O-track2}} & \multicolumn{1}{l|}{\textbf{R-track}} \\ \hline
+\multicolumn{1}{|r|}{0.4} & Avg & -10.6 & -22.4 & -23.9 & -23.91 \\ \hline
+ & Std Div & 0.94 & 2.09 & 2.216 & 2.117 \\ \hline
+ & Learn Time & 6820 & 12041 & 12016 & 16472 \\ \hline
+\multicolumn{1}{|r|}{0.6} & Avg & -10.63 & -23.06 & -23.79 & -23.69 \\ \hline
+ & Std Div & 0.879 & 2.509 & 2.31 & 1.843 \\ \hline
+ & Learn Time & 8025 & 33552 & 17723 & 23532 \\ \hline
+\multicolumn{1}{|r|}{0.8} & Avg & -10.53 & -22.34 & -23.76 & -23.46 \\ \hline
+ & Std Div & 0.793 & 1.976 & 2.27 & 1.723 \\ \hline
+ & Learn Time & 9205 & 20670 & 24149 & 28794 \\ \hline
+\end{tabular}
+\end{center}
+\label{vi_gamma}
+\end{table}
+
+\begin{table}[htbp]
+\caption{Value Iteration with different hard crash values}
+\begin{center}
+\begin{tabular}{|l|l|r|r|r|r|}
+\hline
+\textbf{Hard crash} & \textbf{Measure} & \multicolumn{1}{l|}{\textbf{L-track}} & \multicolumn{1}{l|}{\textbf{O-track}} & \multicolumn{1}{l|}{\textbf{O-track2}} & \multicolumn{1}{l|}{\textbf{R-track}} \\ \hline
+\multicolumn{1}{|r|}{TRUE} & Avg & -12.3 & -23.89 & -26.66 & -28.22 \\ \hline
+ & Std Div & 0.794 & 2.253 & 1.779 & 1.718 \\ \hline
+ & Learn Time & 63918 & 122209 & 119085 & 191510 \\ \hline
+\multicolumn{1}{|r|}{FALSE} & Avg & -10.53 & -22.34 & -23.76 & -23.46 \\ \hline
+ & Std Div & 0.793 & 1.976 & 2.27 & 1.723 \\ \hline
+ & Learn Time & 9205 & 20670 & 24149 & 28794 \\ \hline
+\end{tabular}
+\end{center}
+\label{vi_crash}
+\end{table}
+
+\begin{table}[htbp]
+\caption{Q-Learning with different hard crash values}
+\begin{center}
+\begin{tabular}{|l|l|r|}
+\hline
+\textbf{Hard crash} & \textbf{Measure} & \multicolumn{1}{l|}{\textbf{L-track}} \\ \hline
+\multicolumn{1}{|r|}{TRUE} & Avg & -16.5 \\ \hline
+ & Std Div & 7.36 \\ \hline
+ & Learn Time & 1039240 \\ \hline
+\multicolumn{1}{|r|}{FALSE} & Avg & -11.62 \\ \hline
+ & Std Div & 1.76 \\ \hline
+ & Learn Time & 318601 \\ \hline
+\end{tabular}
+\end{center}
+\label{q_crash}
+\end{table}
+
+\begin{table}[htbp]
+\caption{Q-Learning with different gamma values}
+\begin{center}
+\begin{tabular}{|l|l|r|r|r|r|}
+\hline
+\textbf{Gamma} & \textbf{Measure} & \multicolumn{1}{l|}{\textbf{L-track}} & \multicolumn{1}{l|}{\textbf{O-track}} & \multicolumn{1}{l|}{\textbf{O-track2}} & \multicolumn{1}{l|}{\textbf{R-track}} \\ \hline
+\multicolumn{1}{|r|}{0.2} & Avg & -12.48 & -26.13 & -31.61 & -35.8 \\ \hline
+ & Std Div & 3.74 & 3.36 & 5.62 & 21.78 \\ \hline
+ & Learn Time & 336656 & 857019 & 1014990 & 1173907 \\ \hline
+\multicolumn{1}{|r|}{0.4} & Avg & -11.73 & -25.3 & -27.2 & -26.8 \\ \hline
+ & Std Div & 1.8 & 3.05 & 3.76 & 4 \\ \hline
+ & Learn Time & 332895 & 755475 & 812289 & 929510 \\ \hline
+\multicolumn{1}{|r|}{0.6} & Avg & -11.66 & -25.43 & -27 & -26.61 \\ \hline
+ & Std Div & 1.94 & 3.03 & 3.49 & 3.06 \\ \hline
+ & Learn Time & 320284 & 742514 & 786348 & 874688 \\ \hline
+\multicolumn{1}{|r|}{0.8} & Avg & -11.62 & -25.43 & -26.88 & -26.15 \\ \hline
+ & Std Div & 1.76 & 3.19 & 3.4 & 2.73 \\ \hline
+ & Learn Time & 318601 & 721180 & 765943 & 891569 \\ \hline
+\end{tabular}
+\end{center}
+\label{q_gamma}
+\end{table}
+
+\begin{table}[htbp]
+\caption{Q-Learning with different alpha values}
+\begin{center}
+\begin{tabular}{|l|l|r|r|r|r|}
+\hline
+\textbf{Alpha} & \textbf{Measure} & \multicolumn{1}{l|}{\textbf{L-track}} & \multicolumn{1}{l|}{\textbf{O-track}} & \multicolumn{1}{l|}{\textbf{O-track2}} & \multicolumn{1}{l|}{\textbf{R-track}} \\ \hline
+\multicolumn{1}{|r|}{0.4} & Avg & -11.93 & -25.19 & -27.14 & -27.17 \\ \hline
+ & Std Div & 2.15 & 3.03 & 4.21 & 3.03 \\ \hline
+ & Learn Time & 333305 & 770329 & 819327 & 958934 \\ \hline
+\multicolumn{1}{|r|}{0.6} & Avg & -11.62 & -25.4 & -26.88 & -26.15 \\ \hline
+ & Std Div & 1.76 & 3.19 & 3.4 & 2.73 \\ \hline
+ & Learn Time & 318601 & 721180 & 765942 & 891569 \\ \hline
+\multicolumn{1}{|r|}{0.8} & Avg & -11.74 & -25.6 & -27 & -26.91 \\ \hline
+ & Std Div & 1.86 & 3.62 & 3.23 & 3.19 \\ \hline
+ & Learn Time & 309855 & 713123 & 742386 & 810096 \\ \hline
+\multicolumn{1}{|r|}{1} & Avg & -12.03 & -26.19 & \multicolumn{1}{c|}{-} & \multicolumn{1}{c|}{-} \\ \hline
+ & Std Div & 2.31 & 3.09 & \multicolumn{1}{c|}{-} & \multicolumn{1}{c|}{-} \\ \hline
+ & Learn Time & 287082 & 821553 & \multicolumn{1}{c|}{-} & \multicolumn{1}{c|}{-} \\ \hline
+\end{tabular}
+\end{center}
+\label{q_alpha}
+\end{table}
+
+\begin{table}[htbp]
+\caption{Q-Learning with different annealing values}
+\begin{center}
+\begin{tabular}{|l|l|r|r|r|r|}
+\hline
+\textbf{Annealing} & \textbf{Measure} & \multicolumn{1}{l|}{\textbf{L-track}} & \multicolumn{1}{l|}{\textbf{O-track}} & \multicolumn{1}{l|}{\textbf{O-track2}} & \multicolumn{1}{l|}{\textbf{R-track}} \\ \hline
+\multicolumn{1}{|r|}{60} & Avg & -11.62 & -25.4 & -26.88 & -26.15 \\ \hline
+ & Std Div & 1.76 & 3.19 & 3.4 & 2.73 \\ \hline
+ & Learn Time & 318601 & 721180 & 765942 & 891569 \\ \hline
+\multicolumn{1}{|r|}{100} & Avg & -11.91 & -27 & -25.66 & -26.67 \\ \hline
+ & Std Div & 1.83 & 3.24 & 3.12 & 2.84 \\ \hline
+ & Learn Time & 324167 & 765644 & 717455 & 846569 \\ \hline
+\end{tabular}
+\end{center}
+\label{q_anneal}
+\end{table}
+
+\begin{table}[htbp]
+\caption{Comparison of Value Iteration and Q-Learning}
+\begin{center}
+\begin{tabular}{|l|l|r|r|r|r|}
+\hline
+\textbf{Algorithm} & \textbf{Measure} & \multicolumn{1}{l|}{\textbf{L-track}} & \multicolumn{1}{l|}{\textbf{O-track}} & \multicolumn{1}{l|}{\textbf{O-track2}} & \multicolumn{1}{l|}{\textbf{R-track}} \\ \hline
+Value Iteration & Avg & -10.53 & -22.34 & -23.76 & -23.46 \\ \hline
+ & Std Div & 0.793 & 1.976 & 2.27 & 1.723 \\ \hline
+ & Learn Time & 9205 & 20670 & 24149 & 28794 \\ \hline
+Q-Learning & Avg & -11.62 & -25.4 & -26.88 & -26.15 \\ \hline
+ & Std Div & 1.76 & 3.19 & 3.4 & 2.73 \\ \hline
+ & Learn Time & 318601 & 721180 & 765942 & 891569 \\ \hline
+\end{tabular}
+\end{center}
+\label{comp}
+\end{table}
+
+\section{Discussion}
+
+\section{Conclusions}
+We find that the significant performance penalty of Q-learning does not justify its use in this scenario. However, for a more complex scenario where transition probabilities are not available, it would probably be a better fit. The ability to not be familiar with the exact details of the state-space while still attaining good results is useful. However, as can be seen from the `hard crash' example, realistic situations could easily hamper the ability of Q-learning to explore the state-action-space. This means that in order to get the state-space agnostic behavior of Q-learning, one may end up paying a very high performance cost.
+
+Function approximation is a very promising benefit of Q-learning. It's too bad that we were not able to get our radial basis function implementation to converge. In future work, we would like to investigate the reasons for the failure of RBFs to converge in this instance and to apply them effectively.
+
+
+% many different styles of bibliography are available; plain is fine for this
+% assignment
+\bibliographystyle{plain}
+
+% the bibliography command should contain the name of your .bib file, minus the
+% extension.
+\bibliography{hw6}
+
+% because "document" is an environment, you need to have a closing tag at the
+% end of your document.  Anything written after this tag will not be included in
+% the generated output.
+\end{document}
