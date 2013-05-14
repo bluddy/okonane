@@ -163,8 +163,8 @@ let iterate agent = match agent with
           let delta = abs_float @: learning -. cur_val in
 
           (* debug *)
-          Printf.printf "r:%f, c:%f, l:%f, a:%f, v:%d\n" 
-            reward cur_val learning alpha num_visits;
+          (*Printf.printf "r:%f, c:%f, l:%f, a:%f, v:%d\n" *)
+            (*reward cur_val learning alpha num_visits;*)
           let new_max_d = if delta > max_delta
                           then delta else max_delta in
           (new_max_d , exp_vals', visits')
@@ -173,6 +173,7 @@ let iterate agent = match agent with
         history
     in
     let conv = if max_delta <= a.Q.conv_tolerance then true else false in
+    P.printf "conv: %f\n" max_delta;
     conv, QAgent({ a with 
             Q.max_change = max_delta; 
             expected_rewards = exp_vals;

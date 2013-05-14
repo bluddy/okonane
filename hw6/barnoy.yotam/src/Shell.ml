@@ -8,6 +8,21 @@ module MA = MetricAgent
 
 exception CommandFailure of string
 
+let std_dev scores avg = 
+  let dev = List.fold_left (fun acc s ->
+      let d = s -. avg in
+      acc +. (d *. d))
+    0. scores
+    in
+  let dev' = dev /. (foi @: List.length scores) in
+  sqrt dev'
+
+let avg scores = 
+  let l = List.length scores in
+  let sum = List.fold_left (+.) 0. scores in
+  sum /. foi l
+
+
 (* commands *)
 type subtype_t = EnvCommand
             (* | HelpCommand *)
@@ -249,9 +264,9 @@ let execute command shell args = match snd command with
         sim_count in
       let scores = List.rev scores' in
       if sim_count > 1 then 
-        (P.printf "Simulation scores: \n"; List.iter (P.printf "%.2f ") scores;
-        P.printf 
-        "\nAverage simulation score: %f\n" (total_score /. foi sim_count);
+        (let a = avg scores in
+        P.printf "Simulation scores: \n"; List.iter (P.printf "%.2f ") scores;
+        P.printf "\nAvg score: %f. Std_dev: %f\n" a (std_dev scores a);
         shell)
       else (P.printf "Simulation score: %.2f\n" total_score; shell)
 
