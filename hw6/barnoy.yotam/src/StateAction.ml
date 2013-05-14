@@ -8,7 +8,7 @@ let string_of_st_act (st, act) =
   string_of_state st^" "^string_of_action act
 
 (* euclidean distance isn't good enough *)
-let v_f p = mult_pair 3 p
+let v_f p = mult_pair 5 p
 let a_f p = mult_pair 15 p
 let sam_distance 
   (((p1, v1), a1):state_action_t) (((p2, v2), a2):state_action_t) =

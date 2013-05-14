@@ -205,7 +205,7 @@ let execute command shell args = match snd command with
         {shell with agent=Some agent}
 
   | MetricsCommand ->
-      check_arg_count args 0 0;
+      check_arg_count args 0 1;
       check_agent shell;
       let a = unwrap_maybe shell.agent in
       P.printf "Iterations: %d\n" a.MA.learning_iter;

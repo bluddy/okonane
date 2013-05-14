@@ -80,7 +80,7 @@ type agent_t = ValueIterAgent of Value.agent_t
 
 
 (* get a policy from an agent *)
-let get_policy ?(learn=false) = function
+let get_policy ?(learn=true) = function
   | ValueIterAgent a -> 
       ValuePolicy(a.Value.world, a.Value.expected_values, a.Value.trans_fn)
   | QAgent a -> 
